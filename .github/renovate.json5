@@ -1,0 +1,38 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:recommended",
+    ":semanticCommitsDisabled",
+  ],
+  dependencyDashboard: true,
+  prHourlyLimit: 1,
+  prConcurrentLimit: 3,
+  cargo: {
+    enabled: true,
+  },
+  "github-actions": {
+    enabled: true,
+  },
+  packageRules: [
+    {
+      matchCategories: [
+        "cargo",
+      ],
+      matchUpdateTypes: [
+        "patch",
+        "minor"
+      ],
+      groupName: "Rust dependency updates"
+    },
+    {
+      matchManagers: [
+        "github-actions",
+      ],
+      matchUpdateTypes: [
+        "patch",
+        "minor",
+      ],
+      groupName: "GitHub Actions updates",
+    }
+  ],
+}

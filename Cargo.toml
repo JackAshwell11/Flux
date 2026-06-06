@@ -1,0 +1,52 @@
+[package]
+name = "flux"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+description = "High-performance tensor and autograd library"
+repository = "https://github.com/JackAshwell11/flux"
+readme = "README.md"
+
+keywords = [
+    "machine-learning",
+    "tensor",
+    "autograd",
+]
+
+categories = [
+    "science",
+    "mathematics",
+]
+
+[dev-dependencies]
+test-case = "3.3.1"
+
+# TODO: Enable:
+#[lints.rust]
+#warnings = "deny"
+
+# Extra lint rules which are helpful
+#unsafe_op_in_unsafe_fn = "deny"
+#missing_docs = "warn"
+#unused_crate_dependencies = "warn"
+
+[lints.clippy]
+all = "deny"
+pedantic = "warn"
+nursery = "warn"
+cargo = "warn"
+
+# Extra lint rules which are helpful
+dbg_macro = "deny"
+todo = "deny"
+undocumented_unsafe_blocks = "deny"
+
+# Common pedantic false-positives
+module_name_repetitions = "allow"
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+lto = "thin"

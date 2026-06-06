@@ -1,0 +1,86 @@
+name: 🐛 Bug Report
+description: Report a bug or unexpected behaviour
+labels: ["type: bug", "status: pending"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Thanks for taking the time to report a bug!**
+
+        Before submitting, please check existing issues to see if this problem
+        has already been reported or resolved.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: |
+        Provide a clear and concise description of what the bug is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: |
+        Provide the steps needed to reproduce the issue.
+      placeholder: |
+        1. Go to [...]
+        2. Click on [...]
+        3. Observe [...]
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: |
+        Describe what you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: |
+        Describe what actually happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: |
+        Provide relevant environment details (if applicable).
+      placeholder: |
+        - OS:
+        - Application version:
+        - Runtime / language version:
+        - Hardware (if relevant):
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error output
+      description: |
+        If available, include logs, stack traces, or error messages.
+      placeholder: |
+        Paste logs here or provide a link to a file (e.g. Gist).
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or recordings
+      description: |
+        If applicable, add screenshots or screen recordings to help explain the issue.
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: |
+        Add any other context, details, or related information here.
