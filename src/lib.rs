@@ -2,3 +2,6 @@
 
 /// Tensor operations and storage.
 pub mod tensor;
+
+/// Re-export tensor operations.
+pub use tensor::*;
