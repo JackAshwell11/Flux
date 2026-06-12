@@ -33,7 +33,7 @@ where
             (1, 1) => {
                 // Both tensors are vectors, so perform vector dot product
                 Tensor {
-                    data: vec![self.dot(&rhs)],
+                    data: self.dot(&rhs).data,
                     shape: vec![],
                 }
             }
