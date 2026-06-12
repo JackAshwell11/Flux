@@ -24,10 +24,37 @@ macro_rules! impl_tensor_binary_op {
     };
 }
 
+macro_rules! impl_tensor_binary_op_ref {
+    ($trait:ident, $method:ident, $op:tt) => {
+        impl<'a, T> $trait<&'a Tensor<T>> for &Tensor<T> where T: Copy + $trait<Output = T>,
+        {
+            type Output = Tensor<T>;
+
+            /// Apply an operation to two tensors of the same shape.
+            fn $method(self, rhs: &'a Tensor<T>) -> Self::Output {
+                assert_eq!(self.shape, rhs.shape);
+                Tensor {
+                    data: self
+                        .data
+                        .iter()
+                        .zip(rhs.data.iter())
+                        .map(|(a, b)| *a $op *b)
+                        .collect(),
+                    shape: self.shape.clone(),
+                }
+            }
+        }
+    };
+}
+
 impl_tensor_binary_op!(Add, add, +);
+impl_tensor_binary_op_ref!(Add, add, +);
 impl_tensor_binary_op!(Sub, sub, -);
+impl_tensor_binary_op_ref!(Sub, sub, -);
 impl_tensor_binary_op!(Mul, mul, *);
+impl_tensor_binary_op_ref!(Mul, mul, *);
 impl_tensor_binary_op!(Div, div, /);
+impl_tensor_binary_op_ref!(Div, div, /);
 
 #[cfg(test)]
 mod tests {
