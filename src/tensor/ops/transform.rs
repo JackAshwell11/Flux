@@ -1,7 +1,5 @@
 use crate::Tensor;
 
-use num_traits::Float;
-
 impl<T> Tensor<T>
 where
     T: Copy,
@@ -15,16 +13,6 @@ where
             data: self.data.iter().copied().map(|x| f(x)).collect(),
             shape: self.shape.clone(),
         }
-    }
-}
-
-impl<T> Tensor<T>
-where
-    T: Float,
-{
-    /// Raise the tensor elements to the specified power.
-    pub fn pow(&self, val: T) -> Self {
-        self.map(|x| x.powf(val))
     }
 }
 
