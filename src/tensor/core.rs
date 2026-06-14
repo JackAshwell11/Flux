@@ -16,6 +16,14 @@ impl<T> Tensor<T> {
         self.data.len()
     }
 
+    /// Get the data at a given index.
+    pub fn get(&self, index: usize) -> T
+    where
+        T: Copy,
+    {
+        self.data[index]
+    }
+
     /// Create a tensor from raw data.
     pub fn new(data: impl Into<Vec<T>>, shape: impl Into<Vec<usize>>) -> Self {
         let data = data.into();
@@ -41,13 +49,13 @@ where
 
 impl<T> Tensor<T>
 where
-    T: From<u8> + Clone,
+    T: From<f32> + Clone,
 {
     /// Create a tensor with a given shape and all ones.
     pub fn ones(shape: impl Into<Vec<usize>>) -> Self {
         let shape = shape.into();
         Self {
-            data: vec![T::from(1); shape.iter().product()],
+            data: vec![T::from(1.0); shape.iter().product()],
             shape,
         }
     }
@@ -77,6 +85,21 @@ mod tests {
     fn test_size<const N: usize>(shape: [usize; N], expected_size: usize) {
         let tensor: Tensor<i32> = Tensor::zeros(shape);
         assert_eq!(tensor.size(), expected_size);
+    }
+
+    /// Test that the get method retrieves data correctly at a given index.
+    #[test_case([1, 2, 3, 4], [4], 0, 1; "first element")]
+    #[test_case([1, 2, 3, 4], [4], 3, 4; "last element")]
+    #[test_case([10, 20, 30, 40], [4], 2, 30; "middle element")]
+    #[test_case([-1, -2, -3, -4], [4], 1, -2; "negative values")]
+    fn test_get<const N: usize, const S: usize>(
+        data: [i32; N],
+        shape: [usize; S],
+        index: usize,
+        expected_value: i32,
+    ) {
+        let tensor = Tensor::new(data, shape);
+        assert_eq!(tensor.get(index), expected_value);
     }
 
     /// Test that the tensor constructor produces a tensor with the correct data and shape.
@@ -113,16 +136,16 @@ mod tests {
     }
 
     /// Test that the tensor constructor can be used with a custom shape to give data with all one values.
-    #[test_case([], vec![1], vec![]; "scalar one")]
-    #[test_case([1], vec![1], vec![1]; "single one")]
-    #[test_case([2, 2], vec![1; 4], vec![2, 2]; "matrix ones")]
-    #[test_case([1, 3], vec![1; 3], vec![1, 3]; "row vector ones")]
+    #[test_case([], vec![1.0], vec![]; "scalar one")]
+    #[test_case([1], vec![1.0], vec![1]; "single one")]
+    #[test_case([2, 2], vec![1.0; 4], vec![2, 2]; "matrix ones")]
+    #[test_case([1, 3], vec![1.0; 3], vec![1, 3]; "row vector ones")]
     fn test_ones<const N: usize>(
         shape: [usize; N],
-        expected_data: Vec<i32>,
+        expected_data: Vec<f32>,
         expected_shape: Vec<usize>,
     ) {
-        let tensor: Tensor<i32> = Tensor::ones(shape);
+        let tensor: Tensor<f32> = Tensor::ones(shape);
         assert_eq!(tensor.data, expected_data);
         assert_eq!(tensor.shape, expected_shape);
     }

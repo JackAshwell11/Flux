@@ -8,7 +8,8 @@ pub fn l2_loss<T>(input: &Tensor<T>, target: &Tensor<T>) -> Tensor<T>
 where
     T: Float + Sum,
 {
-    let squared_diffs = (input - target).pow(T::from(2.0).expect("Failed to convert 2.0 into T"));
+    let diff = input - target;
+    let squared_diffs = &diff * &diff;
     squared_diffs.mean()
 }
 
