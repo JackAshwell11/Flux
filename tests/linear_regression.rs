@@ -1,4 +1,4 @@
-use flux::l2_loss;
+use flux::loss::l2_loss;
 use flux::tensor::Tensor;
 
 /// Controls the number of iterations to run the training loop for.
