@@ -4,6 +4,11 @@ use crate::tensor::Tensor;
 
 impl<T> Tensor<T> {
     /// Perform a dot product on two tensors of the same shape.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the shapes of `self` and `rhs` do not match.
+    #[must_use]
     pub fn dot(&self, rhs: &Self) -> Self
     where
         T: Copy + Mul<Output = T> + Add<Output = T>,
@@ -16,7 +21,7 @@ impl<T> Tensor<T> {
             .map(|(a, b)| *a * *b)
             .reduce(|a, b| a + b)
             .unwrap();
-        Tensor {
+        Self {
             data: vec![dot],
             shape: vec![],
         }

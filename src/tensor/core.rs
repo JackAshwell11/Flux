@@ -7,16 +7,19 @@ pub struct Tensor<T> {
 
 impl<T> Tensor<T> {
     /// Get the rank of the tensor.
+    #[must_use]
     pub fn rank(&self) -> usize {
         self.shape.len()
     }
 
     /// Get the size of the tensor.
+    #[must_use]
     pub fn size(&self) -> usize {
         self.data.len()
     }
 
     /// Get the data at a given index.
+    #[must_use]
     pub fn get(&self, index: usize) -> T
     where
         T: Copy,
@@ -25,6 +28,10 @@ impl<T> Tensor<T> {
     }
 
     /// Create a tensor from raw data.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number of elements in `data` does not match the product of `shape`.
     pub fn new(data: impl Into<Vec<T>>, shape: impl Into<Vec<usize>>) -> Self {
         let data = data.into();
         let shape = shape.into();

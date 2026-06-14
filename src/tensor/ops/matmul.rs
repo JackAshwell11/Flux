@@ -7,32 +7,37 @@ where
     T: Default + Copy + Mul<Output = T> + Add<Output = T> + AddAssign,
 {
     /// Perform a matrix multiplication on two tensors of the same shape.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the shapes of `self` and `rhs` are incompatible for matrix multiplication.
+    #[must_use]
     pub fn matmul(self, rhs: Self) -> Self {
         match (self.rank(), rhs.rank()) {
             (0, 0) => {
                 // Both tensors are scalars, so do normal multiplication
-                Tensor {
+                Self {
                     data: vec![self.data[0] * rhs.data[0]],
                     shape: vec![],
                 }
             }
             (0, _) => {
                 // Self is a scalar, so multiply by the right-hand side
-                Tensor {
+                Self {
                     data: rhs.data.iter().map(|x| self.data[0] * *x).collect(),
                     shape: rhs.shape,
                 }
             }
             (_, 0) => {
                 // Rhs is a scalar, so multiply by the left-hand side
-                Tensor {
+                Self {
                     data: self.data.iter().map(|x| *x * rhs.data[0]).collect(),
                     shape: self.shape,
                 }
             }
             (1, 1) => {
                 // Both tensors are vectors, so perform vector dot product
-                Tensor {
+                Self {
                     data: self.dot(&rhs).data,
                     shape: vec![],
                 }
@@ -42,7 +47,7 @@ where
                 assert_eq!(self.shape[0], rhs.shape[0]);
                 let right_columns = rhs.shape[1];
                 let shared_dimension = self.shape[0];
-                let mut result = Tensor::zeros(vec![right_columns]);
+                let mut result = Self::zeros(vec![right_columns]);
                 for col in 0..right_columns {
                     for i in 0..shared_dimension {
                         result.data[col] += self.data[i] * rhs.data[i * right_columns + col];
@@ -55,7 +60,7 @@ where
                 assert_eq!(self.shape[1], rhs.shape[0]);
                 let left_rows = self.shape[0];
                 let shared_dimension = self.shape[1];
-                let mut result = Tensor::zeros(vec![left_rows]);
+                let mut result = Self::zeros(vec![left_rows]);
                 for row in 0..left_rows {
                     for col in 0..shared_dimension {
                         result.data[row] += self.data[row * shared_dimension + col] * rhs.data[col];
@@ -69,7 +74,7 @@ where
                 let left_rows = self.shape[0];
                 let shared_dimension = self.shape[1];
                 let right_columns = rhs.shape[1];
-                let mut result = Tensor::zeros(vec![left_rows, right_columns]);
+                let mut result = Self::zeros(vec![left_rows, right_columns]);
                 for i in 0..left_rows {
                     for j in 0..right_columns {
                         for k in 0..shared_dimension {
@@ -269,6 +274,6 @@ mod tests {
     ) {
         let tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
-        tensor_one.matmul(tensor_two);
+        let _ = tensor_one.matmul(tensor_two);
     }
 }

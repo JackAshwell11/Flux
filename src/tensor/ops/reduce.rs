@@ -9,8 +9,9 @@ where
     T: Sum + Copy,
 {
     /// Sum the elements of a tensor.
+    #[must_use]
     pub fn sum(&self) -> Self {
-        Tensor {
+        Self {
             data: vec![self.data.iter().copied().sum()],
             shape: vec![],
         }
@@ -22,8 +23,9 @@ where
     T: Float,
 {
     /// Compute the absolute value of a tensor.
+    #[must_use]
     pub fn abs(&self) -> Self {
-        Tensor {
+        Self {
             data: self.data.iter().map(|x| x.abs()).collect(),
             shape: self.shape.clone(),
         }
@@ -35,11 +37,16 @@ where
     T: Float + Sum,
 {
     /// Compute the mean of a tensor.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the tensor length cannot be converted to `T`.
+    #[must_use]
     pub fn mean(&self) -> Self {
         let sum: T = self.data.iter().copied().sum();
         let len = T::from(self.data.len()).expect("Failed to convert length to Float");
         let mean_val: T = sum / len;
-        Tensor {
+        Self {
             data: vec![mean_val],
             shape: vec![],
         }
@@ -60,16 +67,18 @@ where
     }
 
     /// Get the minimum value of the tensor.
+    #[must_use]
     pub fn min(&self) -> Self {
-        Tensor {
+        Self {
             data: vec![self.compute_min_max(|a, b| a <= b)],
             shape: vec![],
         }
     }
 
     /// Get the maximum value of the tensor.
+    #[must_use]
     pub fn max(&self) -> Self {
-        Tensor {
+        Self {
             data: vec![self.compute_min_max(|a, b| a >= b)],
             shape: vec![],
         }
@@ -167,7 +176,7 @@ mod tests {
     #[should_panic(expected = "Tensor is empty")]
     fn test_empty_tensor_max() {
         let tensor = Tensor::<i32>::new([], [0]);
-        tensor.max();
+        let _ = tensor.max();
     }
 
     /// Test that computing the min of an empty tensor panics.
@@ -175,6 +184,6 @@ mod tests {
     #[should_panic(expected = "Tensor is empty")]
     fn test_empty_tensor_min() {
         let tensor = Tensor::<i32>::new([], [0]);
-        tensor.min();
+        let _ = tensor.min();
     }
 }

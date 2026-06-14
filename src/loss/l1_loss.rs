@@ -4,6 +4,7 @@ use std::iter::Sum;
 use num_traits::Float;
 
 /// Compute the L1 loss between two tensors.
+#[must_use]
 pub fn l1_loss<T>(input: &Tensor<T>, target: &Tensor<T>) -> Tensor<T>
 where
     T: Float + Sum,

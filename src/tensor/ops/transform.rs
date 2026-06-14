@@ -5,12 +5,13 @@ where
     T: Copy,
 {
     /// Perform a map operation on the tensor.
+    #[must_use]
     pub fn map<F>(&self, f: F) -> Self
     where
         F: Fn(T) -> T,
     {
-        Tensor {
-            data: self.data.iter().copied().map(|x| f(x)).collect(),
+        Self {
+            data: self.data.iter().copied().map(f).collect(),
             shape: self.shape.clone(),
         }
     }
