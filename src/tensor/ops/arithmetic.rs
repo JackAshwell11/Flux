@@ -1,87 +1,276 @@
+use crate::core::{Operation, OperationNode, Tensor, TensorState, next_tensor_id};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
-use crate::tensor::Tensor;
-
-macro_rules! impl_tensor_op {
-    ($arith_trait:ident, $assign_trait:ident, $arith_method:ident, $assign_method:ident, $op:tt) => {
-        impl<'a, T> $arith_trait<&'a Tensor<T>> for &Tensor<T> where T: Copy + $arith_trait<Output = T>
-        {
-            type Output = Tensor<T>;
-
-            /// Apply an operation to two referenced tensors.
-            fn $arith_method(self, rhs: &'a Tensor<T>) -> Self::Output {
-                let out_size = self.size().max(rhs.size());
-                let mut out = Vec::with_capacity(out_size);
-                for i in 0..out_size {
-                    let a = if self.size() == 1 { self.data[0] } else { self.data[i] };
-                    let b = if rhs.size() == 1 { rhs.data[0] } else { rhs.data[i] };
-                    out.push(a $op b);
-                }
-                Tensor {
-                    data: out,
-                    shape: vec![out_size],
-                }
-            }
-        }
-
-        impl<'a, T> $arith_trait<&'a Tensor<T>> for Tensor<T> where T: Copy + $arith_trait<Output = T>,
-        {
-            type Output = Tensor<T>;
-
-            /// Apply an operation to two tensors.
-            fn $arith_method(self, rhs: &'a Tensor<T>) -> Self::Output {
-                (&self).$arith_method(rhs)
-            }
-        }
-
-        impl<T> $arith_trait<T> for &Tensor<T> where T: Copy + $arith_trait<Output = T>
-        {
-            type Output = Tensor<T>;
-
-            /// Apply an operation to a referenced tensor and a scalar.
-            fn $arith_method(self, scalar: T) -> Self::Output {
-                Tensor {
-                    data: self.data.iter().map(|&x| x $op scalar).collect(),
-                    shape: self.shape.clone(),
-                }
-            }
-        }
-
-        impl<'a, T> $assign_trait<&'a Tensor<T>> for Tensor<T> where T: Copy + $arith_trait<Output = T>
-        {
-            /// Apply an assignment operation to two referenced tensors.
-            fn $assign_method(&mut self, rhs: &'a Tensor<T>) {
-                for i in 0..self.data.len() {
-                    let b = if rhs.data.len() == 1 { rhs.data[0] } else { rhs.data[i] };
-                    self.data[i] = self.data[i] $op b;
-                }
-            }
-        }
-
-        impl<T> $assign_trait<Tensor<T>> for Tensor<T> where T: Copy + $arith_trait<Output = T>,
-        {
-            /// Apply an assignment operation to a referenced tensor and a tensor.
-            fn $assign_method(&mut self, rhs: Tensor<T>) {
-                self.$assign_method(&rhs);
-            }
-        }
-
-        impl<T> $assign_trait<T> for Tensor<T> where T: Copy + $arith_trait<Output = T>
-        {
-            /// Apply an assignment operation to a referenced tensor and a scalar.
-            fn $assign_method(&mut self, rhs: T) {
-                for x in &mut self.data {
-                    *x = (*x) $op rhs;
-                }
-            }
-        }
-    };
+/// Get the broadcasted value at a particular index.
+fn get_broadcast_value<T>(data: &[T], i: usize) -> T
+where
+    T: Copy,
+{
+    if data.len() == 1 { data[0] } else { data[i] }
 }
 
-impl_tensor_op!(Add, AddAssign, add, add_assign, +);
-impl_tensor_op!(Sub, SubAssign, sub, sub_assign, -);
-impl_tensor_op!(Mul, MulAssign, mul, mul_assign, *);
-impl_tensor_op!(Div, DivAssign, div, div_assign, /);
+/// Compute the resultant elementwise operation with two tensors.
+fn compute_elementwise_tensor<T, F>(
+    lhs: Tensor<T>,
+    rhs: Tensor<T>,
+    f: F,
+    operation: Operation,
+) -> Tensor<T>
+where
+    T: Copy + Default,
+    F: Fn(T, T) -> T,
+{
+    let size = lhs.size().max(rhs.size());
+    let data = {
+        let lhs_state = lhs.state.borrow();
+        let rhs_state = rhs.state.borrow();
+        let mut data = Vec::with_capacity(size);
+        for i in 0..size {
+            let x = get_broadcast_value(&lhs_state.data, i);
+            let y = get_broadcast_value(&rhs_state.data, i);
+            data.push(f(x, y));
+        }
+        data
+    };
+    Tensor::from_state(TensorState {
+        id: next_tensor_id(),
+        data,
+        shape: vec![size],
+        grad: vec![T::default(); size],
+        node: Some(OperationNode {
+            parents: vec![lhs, rhs],
+            operation,
+        }),
+    })
+}
+
+/// Compute the resultant elementwise operation with a tensor and a scalar.
+fn compute_scalar_tensor<T, F>(lhs: Tensor<T>, rhs: T, f: F, operation: Operation) -> Tensor<T>
+where
+    T: Copy + Default,
+    F: Fn(T, T) -> T,
+{
+    let (data, shape) = {
+        let lhs_state = lhs.state.borrow();
+        (
+            lhs_state.data.iter().map(|&x| f(x, rhs)).collect(),
+            lhs_state.shape.clone(),
+        )
+    };
+    Tensor::from_state(TensorState {
+        id: next_tensor_id(),
+        data,
+        shape,
+        grad: vec![T::default(); lhs.size()],
+        node: Some(OperationNode {
+            parents: vec![lhs],
+            operation,
+        }),
+    })
+}
+
+/// Apply the resultant elementwise operation between a tensor and another tensor updating the
+/// left-hand side tensor.
+fn apply_elementwise_assign<T, F>(lhs: &mut Tensor<T>, rhs: &Tensor<T>, f: F)
+where
+    T: Copy,
+    F: Fn(T, T) -> T,
+{
+    let mut lhs_state = lhs.state.borrow_mut();
+    let rhs_state = rhs.state.borrow();
+    for i in 0..lhs_state.data.len() {
+        lhs_state.data[i] = f(lhs_state.data[i], get_broadcast_value(&rhs_state.data, i));
+    }
+}
+
+/// Apply the resultant elementwise operation between a tensor and a scalar updating the left-hand
+/// side tensor.
+fn apply_scalar_assign<T, F>(lhs: &mut Tensor<T>, rhs: T, f: F)
+where
+    T: Copy,
+    F: Fn(T, T) -> T,
+{
+    let mut lhs_state = lhs.state.borrow_mut();
+    for x in &mut lhs_state.data {
+        *x = f(*x, rhs);
+    }
+}
+
+impl<T> Add for Tensor<T>
+where
+    T: Copy + Add<Output = T> + Default,
+{
+    type Output = Tensor<T>;
+
+    /// Add two referenced tensors.
+    fn add(self, rhs: Self) -> Self::Output {
+        compute_elementwise_tensor(self, rhs, |a, b| a + b, Operation::Add)
+    }
+}
+
+impl<T> Add<T> for Tensor<T>
+where
+    T: Copy + Add<Output = T> + Default,
+{
+    type Output = Tensor<T>;
+
+    /// Add a referenced tensor and a scalar.
+    fn add(self, scalar: T) -> Self::Output {
+        compute_scalar_tensor(self, scalar, |a, b| a + b, Operation::Add)
+    }
+}
+
+impl<T> AddAssign<Tensor<T>> for Tensor<T>
+where
+    T: Copy + Add<Output = T>,
+{
+    /// Add a tensor to all tensor elements.
+    fn add_assign(&mut self, rhs: Tensor<T>) {
+        apply_elementwise_assign(self, &rhs, |a, b| a + b);
+    }
+}
+
+impl<T> AddAssign<T> for Tensor<T>
+where
+    T: Copy + Add<Output = T>,
+{
+    /// Add a scalar to all tensor elements.
+    fn add_assign(&mut self, rhs: T) {
+        apply_scalar_assign(self, rhs, |a, b| a + b);
+    }
+}
+
+impl<T> Sub for Tensor<T>
+where
+    T: Copy + Sub<Output = T> + Default,
+{
+    type Output = Tensor<T>;
+
+    /// Subtract two referenced tensors.
+    fn sub(self, rhs: Self) -> Self::Output {
+        compute_elementwise_tensor(self, rhs, |a, b| a - b, Operation::Sub)
+    }
+}
+
+impl<T> Sub<T> for Tensor<T>
+where
+    T: Copy + Sub<Output = T> + Default,
+{
+    type Output = Tensor<T>;
+
+    /// Subtract a scalar from a referenced tensor.
+    fn sub(self, scalar: T) -> Self::Output {
+        compute_scalar_tensor(self, scalar, |a, b| a - b, Operation::Sub)
+    }
+}
+
+impl<T> SubAssign<Tensor<T>> for Tensor<T>
+where
+    T: Copy + Sub<Output = T>,
+{
+    /// Subtract a tensor from all tensor elements.
+    fn sub_assign(&mut self, rhs: Tensor<T>) {
+        apply_elementwise_assign(self, &rhs, |a, b| a - b);
+    }
+}
+
+impl<T> SubAssign<T> for Tensor<T>
+where
+    T: Copy + Sub<Output = T>,
+{
+    /// Subtract a tensor from all tensor elements.
+    fn sub_assign(&mut self, rhs: T) {
+        apply_scalar_assign(self, rhs, |a, b| a - b);
+    }
+}
+
+impl<T> Mul for Tensor<T>
+where
+    T: Copy + Mul<Output = T> + Default,
+{
+    type Output = Tensor<T>;
+
+    /// Multiply two tensors.
+    fn mul(self, rhs: Self) -> Self::Output {
+        compute_elementwise_tensor(self, rhs, |a, b| a * b, Operation::Mul)
+    }
+}
+
+impl<T> Mul<T> for Tensor<T>
+where
+    T: Copy + Mul<Output = T> + Default,
+{
+    type Output = Tensor<T>;
+
+    /// Multiply a tensor by a scalar.
+    fn mul(self, scalar: T) -> Self::Output {
+        compute_scalar_tensor(self, scalar, |a, b| a * b, Operation::Mul)
+    }
+}
+
+impl<T> MulAssign<Tensor<T>> for Tensor<T>
+where
+    T: Copy + Mul<Output = T>,
+{
+    /// Multiply all tensor elements by a tensor.
+    fn mul_assign(&mut self, rhs: Tensor<T>) {
+        apply_elementwise_assign(self, &rhs, |a, b| a * b);
+    }
+}
+
+impl<T> MulAssign<T> for Tensor<T>
+where
+    T: Copy + Mul<Output = T>,
+{
+    /// Multiply all tensor elements by a scalar.
+    fn mul_assign(&mut self, rhs: T) {
+        apply_scalar_assign(self, rhs, |a, b| a * b);
+    }
+}
+
+impl<T> Div for Tensor<T>
+where
+    T: Copy + Div<Output = T> + Default,
+{
+    type Output = Tensor<T>;
+
+    /// Divide two tensors.
+    fn div(self, rhs: Self) -> Self::Output {
+        compute_elementwise_tensor(self, rhs, |a, b| a / b, Operation::Div)
+    }
+}
+
+impl<T> Div<T> for Tensor<T>
+where
+    T: Copy + Div<Output = T> + Default,
+{
+    type Output = Tensor<T>;
+
+    /// Divide a tensor by a scalar.
+    fn div(self, scalar: T) -> Self::Output {
+        compute_scalar_tensor(self, scalar, |a, b| a / b, Operation::Div)
+    }
+}
+
+impl<T> DivAssign<Tensor<T>> for Tensor<T>
+where
+    T: Copy + Div<Output = T>,
+{
+    /// Divide all tensor elements by a tensor.
+    fn div_assign(&mut self, rhs: Tensor<T>) {
+        apply_elementwise_assign(self, &rhs, |a, b| a / b);
+    }
+}
+
+impl<T> DivAssign<T> for Tensor<T>
+where
+    T: Copy + Div<Output = T>,
+{
+    /// Divide all tensor elements by a scalar.
+    fn div_assign(&mut self, rhs: T) {
+        apply_scalar_assign(self, rhs, |a, b| a / b);
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -146,9 +335,9 @@ mod tests {
     ) {
         let tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
-        let result = &tensor_one + &tensor_two;
-        assert_eq!(result.data, expected);
-        assert_eq!(result.shape, vec![expected.len()]);
+        let result = tensor_one + tensor_two;
+        assert_eq!(result.state.borrow().data, expected);
+        assert_eq!(result.state.borrow().shape, vec![expected.len()]);
     }
 
     /// Test that the tensor addition assignment operator works correctly.
@@ -193,8 +382,8 @@ mod tests {
     ) {
         let mut tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
-        tensor_one += &tensor_two;
-        assert_eq!(tensor_one.data, expected);
+        tensor_one += tensor_two;
+        assert_eq!(tensor_one.state.borrow().data, expected);
     }
 
     /// Test that the tensor subtraction operator works correctly.
@@ -247,9 +436,9 @@ mod tests {
     ) {
         let tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
-        let result = &tensor_one - &tensor_two;
-        assert_eq!(result.data, expected);
-        assert_eq!(result.shape, vec![expected.len()]);
+        let result = tensor_one - tensor_two;
+        assert_eq!(result.state.borrow().data, expected);
+        assert_eq!(result.state.borrow().shape, vec![expected.len()]);
     }
 
     /// Test that the tensor subtraction assignment operator works correctly.
@@ -294,8 +483,8 @@ mod tests {
     ) {
         let mut tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
-        tensor_one -= &tensor_two;
-        assert_eq!(tensor_one.data, expected);
+        tensor_one -= tensor_two;
+        assert_eq!(tensor_one.state.borrow().data, expected);
     }
 
     /// Test that the tensor multiplication operator works correctly.
@@ -348,9 +537,9 @@ mod tests {
     ) {
         let tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
-        let result = &tensor_one * &tensor_two;
-        assert_eq!(result.data, expected);
-        assert_eq!(result.shape, vec![expected.len()]);
+        let result = tensor_one * tensor_two;
+        assert_eq!(result.state.borrow().data, expected);
+        assert_eq!(result.state.borrow().shape, vec![expected.len()]);
     }
 
     /// Test that the tensor multiplication assignment operator works correctly.
@@ -395,8 +584,8 @@ mod tests {
     ) {
         let mut tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
-        tensor_one *= &tensor_two;
-        assert_eq!(tensor_one.data, expected);
+        tensor_one *= tensor_two;
+        assert_eq!(tensor_one.state.borrow().data, expected);
     }
 
     /// Test that the tensor division operator works correctly (integer division).
@@ -449,9 +638,9 @@ mod tests {
     ) {
         let tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
-        let result = &tensor_one / &tensor_two;
-        assert_eq!(result.data, expected);
-        assert_eq!(result.shape, vec![expected.len()]);
+        let result = tensor_one / tensor_two;
+        assert_eq!(result.state.borrow().data, expected);
+        assert_eq!(result.state.borrow().shape, vec![expected.len()]);
     }
 
     /// Test that the tensor division assignment operator works correctly.
@@ -496,7 +685,7 @@ mod tests {
     ) {
         let mut tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
-        tensor_one /= &tensor_two;
-        assert_eq!(tensor_one.data, expected);
+        tensor_one /= tensor_two;
+        assert_eq!(tensor_one.state.borrow().data, expected);
     }
 }

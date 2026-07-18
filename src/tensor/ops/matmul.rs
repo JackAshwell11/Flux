@@ -1,6 +1,6 @@
+use crate::core::{TensorState, next_tensor_id};
+use crate::tensor::core::Tensor;
 use std::ops::{Add, AddAssign, Mul};
-
-use crate::tensor::Tensor;
 
 impl<T> Tensor<T>
 where
@@ -16,75 +16,150 @@ where
         match (self.rank(), rhs.rank()) {
             (0, 0) => {
                 // Both tensors are scalars, so do normal multiplication
-                Self {
-                    data: vec![self.data[0] * rhs.data[0]],
+                let value = {
+                    let lhs_state = self.state.borrow();
+                    let rhs_state = rhs.state.borrow();
+                    lhs_state.data[0] * rhs_state.data[0]
+                };
+                Self::from_state(TensorState {
+                    id: next_tensor_id(),
+                    data: vec![value],
                     shape: vec![],
-                }
+                    grad: vec![T::default(); 1],
+                    node: None,
+                })
             }
             (0, _) => {
                 // Self is a scalar, so multiply by the right-hand side
-                Self {
-                    data: rhs.data.iter().map(|x| self.data[0] * *x).collect(),
-                    shape: rhs.shape,
-                }
+                let (data, shape) = {
+                    let lhs_state = self.state.borrow();
+                    let rhs_state = rhs.state.borrow();
+                    (
+                        rhs_state
+                            .data
+                            .iter()
+                            .map(|x| lhs_state.data[0] * *x)
+                            .collect::<Vec<T>>(),
+                        rhs_state.shape.clone(),
+                    )
+                };
+                let size = data.len();
+                Self::from_state(TensorState {
+                    id: next_tensor_id(),
+                    data,
+                    shape,
+                    grad: vec![T::default(); size],
+                    node: None,
+                })
             }
             (_, 0) => {
                 // Rhs is a scalar, so multiply by the left-hand side
-                Self {
-                    data: self.data.iter().map(|x| *x * rhs.data[0]).collect(),
-                    shape: self.shape,
-                }
+                let (data, shape) = {
+                    let lhs_state = self.state.borrow();
+                    let rhs_state = rhs.state.borrow();
+                    (
+                        lhs_state
+                            .data
+                            .iter()
+                            .map(|x| *x * rhs_state.data[0])
+                            .collect::<Vec<T>>(),
+                        lhs_state.shape.clone(),
+                    )
+                };
+                let size = data.len();
+                Self::from_state(TensorState {
+                    id: next_tensor_id(),
+                    data,
+                    shape,
+                    grad: vec![T::default(); size],
+                    node: None,
+                })
             }
             (1, 1) => {
                 // Both tensors are vectors, so perform vector dot product
-                Self {
-                    data: self.dot(&rhs).data,
-                    shape: vec![],
-                }
+                self.dot(&rhs)
             }
             (1, 2) => {
                 // Self is a vector, so multiply by the right-hand side
-                assert_eq!(self.shape[0], rhs.shape[0]);
-                let right_columns = rhs.shape[1];
-                let shared_dimension = self.shape[0];
-                let mut result = Self::zeros(vec![right_columns]);
-                for col in 0..right_columns {
-                    for i in 0..shared_dimension {
-                        result.data[col] += self.data[i] * rhs.data[i * right_columns + col];
+                let (data, shape) = {
+                    let lhs_state = self.state.borrow();
+                    let rhs_state = rhs.state.borrow();
+                    assert_eq!(lhs_state.shape[0], rhs_state.shape[0]);
+                    let right_columns = rhs_state.shape[1];
+                    let shared_dimension = lhs_state.shape[0];
+                    let mut result = vec![T::default(); right_columns];
+                    for col in 0..right_columns {
+                        for i in 0..shared_dimension {
+                            result[col] +=
+                                lhs_state.data[i] * rhs_state.data[i * right_columns + col];
+                        }
                     }
-                }
-                result
+                    (result, vec![right_columns])
+                };
+                let size = data.len();
+                Self::from_state(TensorState {
+                    id: next_tensor_id(),
+                    data,
+                    shape,
+                    grad: vec![T::default(); size],
+                    node: None,
+                })
             }
             (2, 1) => {
                 // Rhs is a vector, so multiply by the left-hand side
-                assert_eq!(self.shape[1], rhs.shape[0]);
-                let left_rows = self.shape[0];
-                let shared_dimension = self.shape[1];
-                let mut result = Self::zeros(vec![left_rows]);
-                for row in 0..left_rows {
-                    for col in 0..shared_dimension {
-                        result.data[row] += self.data[row * shared_dimension + col] * rhs.data[col];
+                let (data, shape) = {
+                    let lhs_state = self.state.borrow();
+                    let rhs_state = rhs.state.borrow();
+                    assert_eq!(lhs_state.shape[1], rhs_state.shape[0]);
+                    let left_rows = lhs_state.shape[0];
+                    let shared_dimension = lhs_state.shape[1];
+                    let mut result = vec![T::default(); left_rows];
+                    for row in 0..left_rows {
+                        for col in 0..shared_dimension {
+                            result[row] +=
+                                lhs_state.data[row * shared_dimension + col] * rhs_state.data[col];
+                        }
                     }
-                }
-                result
+                    (result, vec![left_rows])
+                };
+                let size = data.len();
+                Self::from_state(TensorState {
+                    id: next_tensor_id(),
+                    data,
+                    shape,
+                    grad: vec![T::default(); size],
+                    node: None,
+                })
             }
             (2, 2) => {
                 // Both tensors are matrices, so perform matrix multiplication
-                assert_eq!(self.shape[1], rhs.shape[0]);
-                let left_rows = self.shape[0];
-                let shared_dimension = self.shape[1];
-                let right_columns = rhs.shape[1];
-                let mut result = Self::zeros(vec![left_rows, right_columns]);
-                for i in 0..left_rows {
-                    for j in 0..right_columns {
-                        for k in 0..shared_dimension {
-                            result.data[i * right_columns + j] += self.data
-                                [i * shared_dimension + k]
-                                * rhs.data[k * right_columns + j];
+                let (data, shape) = {
+                    let lhs_state = self.state.borrow();
+                    let rhs_state = rhs.state.borrow();
+                    assert_eq!(lhs_state.shape[1], rhs_state.shape[0]);
+                    let left_rows = lhs_state.shape[0];
+                    let shared_dimension = lhs_state.shape[1];
+                    let right_columns = rhs_state.shape[1];
+                    let mut result = vec![T::default(); left_rows * right_columns];
+                    for i in 0..left_rows {
+                        for j in 0..right_columns {
+                            for k in 0..shared_dimension {
+                                result[i * right_columns + j] += lhs_state.data
+                                    [i * shared_dimension + k]
+                                    * rhs_state.data[k * right_columns + j];
+                            }
                         }
                     }
-                }
-                result
+                    (result, vec![left_rows, right_columns])
+                };
+                let size = data.len();
+                Self::from_state(TensorState {
+                    id: next_tensor_id(),
+                    data,
+                    shape,
+                    grad: vec![T::default(); size],
+                    node: None,
+                })
             }
             _ => unimplemented!(
                 "Matrix multiplication for tensors of rank {} and {} is not implemented",
@@ -220,8 +295,8 @@ mod tests {
         let tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
         let result = tensor_one.matmul(tensor_two);
-        assert_eq!(result.data, expected_data);
-        assert_eq!(result.shape, expected_shape);
+        assert_eq!(result.state.borrow().data, expected_data);
+        assert_eq!(result.state.borrow().shape, expected_shape);
     }
 
     /// Test that matrix multiplication panics for unsupported dimensionality or incompatible shapes.

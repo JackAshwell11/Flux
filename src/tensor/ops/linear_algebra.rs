@@ -1,6 +1,6 @@
+use crate::core::{TensorState, next_tensor_id};
+use crate::tensor::core::Tensor;
 use std::ops::{Add, Mul};
-
-use crate::tensor::Tensor;
 
 impl<T> Tensor<T> {
     /// Perform a dot product on two tensors of the same shape.
@@ -11,20 +11,27 @@ impl<T> Tensor<T> {
     #[must_use]
     pub fn dot(&self, rhs: &Self) -> Self
     where
-        T: Copy + Mul<Output = T> + Add<Output = T>,
+        T: Copy + Mul<Output = T> + Add<Output = T> + Default,
     {
-        assert_eq!(self.shape, rhs.shape);
-        let dot = self
-            .data
-            .iter()
-            .zip(rhs.data.iter())
-            .map(|(a, b)| *a * *b)
-            .reduce(|a, b| a + b)
-            .unwrap();
-        Self {
+        let dot = {
+            let lhs_state = self.state.borrow();
+            let rhs_state = rhs.state.borrow();
+            assert_eq!(lhs_state.shape, rhs_state.shape);
+            lhs_state
+                .data
+                .iter()
+                .zip(rhs_state.data.iter())
+                .map(|(a, b)| *a * *b)
+                .reduce(|a, b| a + b)
+                .unwrap()
+        };
+        Self::from_state(TensorState {
+            id: next_tensor_id(),
             data: vec![dot],
             shape: vec![],
-        }
+            grad: vec![T::default(); 1],
+            node: None,
+        })
     }
 }
 
@@ -108,7 +115,7 @@ mod tests {
         let tensor_one = Tensor::new(a, shape);
         let tensor_two = Tensor::new(b, shape);
         let result = tensor_one.dot(&tensor_two);
-        assert_eq!(result.data, expected_data);
-        assert_eq!(result.shape, expected_shape);
+        assert_eq!(result.state.borrow().data, expected_data);
+        assert_eq!(result.state.borrow().shape, expected_shape);
     }
 }
