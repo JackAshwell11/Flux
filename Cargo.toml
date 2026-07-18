@@ -49,7 +49,7 @@ undocumented_unsafe_blocks = "deny"
 module_name_repetitions = "allow"
 
 [profile.dev]
-opt-level = 1
+opt-level = 0
 
 [profile.release]
 lto = "thin"

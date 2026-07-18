@@ -1,21 +1,77 @@
-/// Represents a tensor with a given shape and data type.
-#[derive(Debug, Clone)]
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+/// Represents a tensor in Flux.
+#[derive(Debug)]
 pub struct Tensor<T> {
+    // The pointer to the tensor state
+    pub(crate) state: Rc<RefCell<TensorState<T>>>,
+}
+
+/// Stores the mutable data and autograd information for a tensor.
+#[derive(Debug)]
+pub(crate) struct TensorState<T> {
+    // The ID of this tensor in Flux
+    pub(crate) id: usize,
+
+    // The core data for the tensor
     pub(crate) data: Vec<T>,
     pub(crate) shape: Vec<usize>,
+
+    // The gradient of this tensor
+    pub(crate) grad: Vec<T>,
+
+    // The autograd link for this tensor
+    pub(crate) node: Option<OperationNode<T>>,
+}
+
+/// Represents a node in the computation graph.
+#[derive(Clone, Debug)]
+pub(crate) struct OperationNode<T> {
+    // The parents of this tensor in the computation graph
+    pub(crate) parents: Vec<Tensor<T>>,
+
+    // The operation that produced this tensor
+    pub(crate) operation: Operation,
+}
+
+/// Represents an operation on tensors.
+#[derive(Debug, Clone)]
+pub(crate) enum Operation {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mean,
+}
+
+impl<T> Clone for Tensor<T> {
+    /// Allows tensors to be cheaply cloned by cloning their shared state pointer.
+    fn clone(&self) -> Self {
+        Self {
+            state: Rc::clone(&self.state),
+        }
+    }
+}
+
+/// Generate a unique ID for a tensor.
+pub(crate) fn next_tensor_id() -> usize {
+    static TENSOR_COUNTER: AtomicUsize = AtomicUsize::new(0);
+    TENSOR_COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
 impl<T> Tensor<T> {
     /// Get the rank of the tensor.
     #[must_use]
     pub fn rank(&self) -> usize {
-        self.shape.len()
+        self.state.borrow().shape.len()
     }
 
     /// Get the size of the tensor.
     #[must_use]
     pub fn size(&self) -> usize {
-        self.data.len()
+        self.state.borrow().data.len()
     }
 
     /// Get the data at a given index.
@@ -24,7 +80,19 @@ impl<T> Tensor<T> {
     where
         T: Copy,
     {
-        self.data[index]
+        self.state.borrow().data[index]
+    }
+}
+
+impl<T> Tensor<T>
+where
+    T: Default + Clone,
+{
+    /// Create a tensor from a TensorState struct.
+    pub(crate) fn from_state(state: TensorState<T>) -> Self {
+        Self {
+            state: Rc::new(RefCell::new(state)),
+        }
     }
 
     /// Create a tensor from raw data.
@@ -35,36 +103,46 @@ impl<T> Tensor<T> {
     pub fn new(data: impl Into<Vec<T>>, shape: impl Into<Vec<usize>>) -> Self {
         let data = data.into();
         let shape = shape.into();
-        assert_eq!(data.len(), shape.iter().product::<usize>());
-        Self { data, shape }
+        let num_elements = shape.iter().product::<usize>();
+        assert_eq!(data.len(), num_elements);
+        Self::from_state(TensorState {
+            id: next_tensor_id(),
+            data,
+            shape,
+            grad: vec![T::default(); num_elements],
+            node: None,
+        })
     }
-}
 
-impl<T> Tensor<T>
-where
-    T: Default + Clone,
-{
     /// Create a tensor with a given shape and all zeros.
     pub fn zeros(shape: impl Into<Vec<usize>>) -> Self {
         let shape = shape.into();
-        Self {
-            data: vec![T::default(); shape.iter().product()],
+        let num_elements = shape.iter().product::<usize>();
+        Self::from_state(TensorState {
+            id: next_tensor_id(),
+            data: vec![T::default(); num_elements],
             shape,
-        }
+            grad: vec![T::default(); num_elements],
+            node: None,
+        })
     }
 }
 
 impl<T> Tensor<T>
 where
-    T: From<f32> + Clone,
+    T: From<f32> + Clone + Default,
 {
     /// Create a tensor with a given shape and all ones.
     pub fn ones(shape: impl Into<Vec<usize>>) -> Self {
         let shape = shape.into();
-        Self {
-            data: vec![T::from(1.0); shape.iter().product()],
+        let num_elements = shape.iter().product::<usize>();
+        Self::from_state(TensorState {
+            id: next_tensor_id(),
+            data: vec![T::from(1.0); num_elements],
             shape,
-        }
+            grad: vec![T::default(); num_elements],
+            node: None,
+        })
     }
 }
 
@@ -122,8 +200,8 @@ mod tests {
         expected_shape: Vec<usize>,
     ) {
         let tensor = Tensor::new(data, shape);
-        assert_eq!(tensor.data, expected_data);
-        assert_eq!(tensor.shape, expected_shape);
+        assert_eq!(tensor.state.borrow().data, expected_data);
+        assert_eq!(tensor.state.borrow().shape, expected_shape);
     }
 
     /// Test that the tensor constructor can be used with a custom shape to give data with all zero
@@ -138,8 +216,8 @@ mod tests {
         expected_shape: Vec<usize>,
     ) {
         let tensor: Tensor<i32> = Tensor::zeros(shape);
-        assert_eq!(tensor.data, expected_data);
-        assert_eq!(tensor.shape, expected_shape);
+        assert_eq!(tensor.state.borrow().data, expected_data);
+        assert_eq!(tensor.state.borrow().shape, expected_shape);
     }
 
     /// Test that the tensor constructor can be used with a custom shape to give data with all one values.
@@ -153,7 +231,7 @@ mod tests {
         expected_shape: Vec<usize>,
     ) {
         let tensor: Tensor<f32> = Tensor::ones(shape);
-        assert_eq!(tensor.data, expected_data);
-        assert_eq!(tensor.shape, expected_shape);
+        assert_eq!(tensor.state.borrow().data, expected_data);
+        assert_eq!(tensor.state.borrow().shape, expected_shape);
     }
 }

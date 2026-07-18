@@ -1,26 +1,25 @@
-use crate::Tensor;
+use crate::core::Tensor;
 use std::iter::Sum;
 
 use num_traits::Float;
 
 /// Compute the L1 loss between two tensors.
 #[must_use]
-pub fn l1_loss<T>(input: &Tensor<T>, target: &Tensor<T>) -> Tensor<T>
+pub fn l1_loss<T>(input: Tensor<T>, target: Tensor<T>) -> Tensor<T>
 where
-    T: Float + Sum,
+    T: Float + Sum + Default,
 {
-    let absolute_diffs = (input - target).abs();
-    absolute_diffs.mean()
+    (input - target).abs().mean()
 }
 
 /// Compute the L2 loss between two tensors.
 #[must_use]
-pub fn l2_loss<T>(input: &Tensor<T>, target: &Tensor<T>) -> Tensor<T>
+pub fn l2_loss<T>(input: Tensor<T>, target: Tensor<T>) -> Tensor<T>
 where
-    T: Float + Sum,
+    T: Float + Sum + Default,
 {
     let diff = input - target;
-    let squared_diffs = &diff * &diff;
+    let squared_diffs = diff.clone() * diff;
     squared_diffs.mean()
 }
 
@@ -63,8 +62,8 @@ mod tests {
     ) {
         let input_tensor = Tensor::new(input, input_shape);
         let target_tensor = Tensor::new(target, target_shape);
-        let result = l1_loss(&input_tensor, &target_tensor);
-        assert!((result.data[0] - expected).abs() < 1e-6);
+        let result = l1_loss(input_tensor, target_tensor);
+        assert!((result.state.borrow().data[0] - expected).abs() < 1e-6);
     }
 
     /// Test that the L2 loss function computes the correct result.
@@ -101,7 +100,7 @@ mod tests {
     ) {
         let input_tensor = Tensor::new(input, input_shape);
         let target_tensor = Tensor::new(target, target_shape);
-        let result = l2_loss(&input_tensor, &target_tensor);
-        assert!((result.data[0] - expected).abs() < 1e-6);
+        let result = l2_loss(input_tensor, target_tensor);
+        assert!((result.state.borrow().data[0] - expected).abs() < 1e-6);
     }
 }
