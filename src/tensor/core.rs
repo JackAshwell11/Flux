@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::fmt::Debug;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -6,44 +7,40 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 #[derive(Debug)]
 pub struct Tensor<T> {
     // The pointer to the tensor state
-    pub(crate) state: Rc<RefCell<TensorState<T>>>,
+    pub state: Rc<RefCell<TensorState<T>>>,
 }
 
 /// Stores the mutable data and autograd information for a tensor.
 #[derive(Debug)]
-pub(crate) struct TensorState<T> {
+pub struct TensorState<T> {
     // The ID of this tensor in Flux
     pub(crate) id: usize,
 
     // The core data for the tensor
-    pub(crate) data: Vec<T>,
+    pub data: Vec<T>,
     pub(crate) shape: Vec<usize>,
 
     // The gradient of this tensor
-    pub(crate) grad: Vec<T>,
+    pub grad: Vec<T>,
 
     // The autograd link for this tensor
     pub(crate) node: Option<OperationNode<T>>,
 }
 
 /// Represents a node in the computation graph.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct OperationNode<T> {
     // The parents of this tensor in the computation graph
     pub(crate) parents: Vec<Tensor<T>>,
 
     // The operation that produced this tensor
-    pub(crate) operation: Operation,
+    pub(crate) operation: Box<dyn Operation<T>>,
 }
 
 /// Represents an operation on tensors.
-#[derive(Debug, Clone)]
-pub(crate) enum Operation {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mean,
+pub(crate) trait Operation<T>: Debug {
+    /// Propagates the incoming gradient through the operation to its inputs.
+    fn backward(&self, incoming_grad: &Tensor<T>, parents: &[Tensor<T>]);
 }
 
 impl<T> Clone for Tensor<T> {

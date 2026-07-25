@@ -1,6 +1,9 @@
-use crate::core::{Operation, OperationNode, Tensor, TensorState, next_tensor_id};
+use crate::autograd::operations::MeanOperation;
+use crate::core::{OperationNode, Tensor, TensorState, next_tensor_id};
 use num_traits::Float;
+use std::fmt::Debug;
 use std::iter::Sum;
+use std::ops::AddAssign;
 
 impl<T> Tensor<T>
 where
@@ -38,7 +41,7 @@ where
 
 impl<T> Tensor<T>
 where
-    T: Float + Sum + Default,
+    T: Float + Sum + Default + AddAssign + Debug + 'static,
 {
     /// Compute the mean of a tensor.
     ///
@@ -47,11 +50,11 @@ where
     /// Panics if the tensor length cannot be converted to `T`.
     #[must_use]
     pub fn mean(&self) -> Self {
-        let mean_val = {
+        let (mean_val, len) = {
             let state = self.state.borrow();
             let sum: T = state.data.iter().copied().sum();
             let len = T::from(state.data.len()).expect("Failed to convert length to Float");
-            sum / len
+            (sum / len, len)
         };
         Self::from_state(TensorState {
             id: next_tensor_id(),
@@ -60,7 +63,9 @@ where
             grad: vec![T::default(); 1],
             node: Some(OperationNode {
                 parents: vec![self.clone()],
-                operation: Operation::Mean,
+                operation: Box::new(MeanOperation {
+                    scale: T::one() / len,
+                }),
             }),
         })
     }

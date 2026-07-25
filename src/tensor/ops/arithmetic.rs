@@ -1,5 +1,8 @@
+use crate::autograd::operations::{
+    AddOperation, DivOperation, MulOperation, NegateOperation, SubOperation,
+};
 use crate::core::{Operation, OperationNode, Tensor, TensorState, next_tensor_id};
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 /// Get the broadcasted value at a particular index.
 fn get_broadcast_value<T>(data: &[T], i: usize) -> T
@@ -10,15 +13,16 @@ where
 }
 
 /// Compute the resultant elementwise operation with two tensors.
-fn compute_elementwise_tensor<T, F>(
+fn compute_elementwise_tensor<T, F, O>(
     lhs: Tensor<T>,
     rhs: Tensor<T>,
     f: F,
-    operation: Operation,
+    operation: O,
 ) -> Tensor<T>
 where
     T: Copy + Default,
     F: Fn(T, T) -> T,
+    O: Operation<T> + 'static,
 {
     let size = lhs.size().max(rhs.size());
     let data = {
@@ -39,16 +43,17 @@ where
         grad: vec![T::default(); size],
         node: Some(OperationNode {
             parents: vec![lhs, rhs],
-            operation,
+            operation: Box::new(operation),
         }),
     })
 }
 
 /// Compute the resultant elementwise operation with a tensor and a scalar.
-fn compute_scalar_tensor<T, F>(lhs: Tensor<T>, rhs: T, f: F, operation: Operation) -> Tensor<T>
+fn compute_scalar_tensor<T, F, O>(lhs: Tensor<T>, rhs: T, f: F, operation: O) -> Tensor<T>
 where
     T: Copy + Default,
     F: Fn(T, T) -> T,
+    O: Operation<T> + 'static,
 {
     let (data, shape) = {
         let lhs_state = lhs.state.borrow();
@@ -64,7 +69,33 @@ where
         grad: vec![T::default(); lhs.size()],
         node: Some(OperationNode {
             parents: vec![lhs],
-            operation,
+            operation: Box::new(operation),
+        }),
+    })
+}
+
+/// Compute the resultant elementwise operation with a single tensor.
+fn compute_unary_tensor<T, F, O>(tensor: Tensor<T>, f: F, operation: O) -> Tensor<T>
+where
+    T: Copy + Default,
+    F: Fn(T) -> T,
+    O: Operation<T> + 'static,
+{
+    let (data, shape) = {
+        let state = tensor.state.borrow();
+        (
+            state.data.iter().map(|&x| f(x)).collect(),
+            state.shape.clone(),
+        )
+    };
+    Tensor::from_state(TensorState {
+        id: next_tensor_id(),
+        data,
+        shape,
+        grad: vec![T::default(); tensor.size()],
+        node: Some(OperationNode {
+            parents: vec![tensor],
+            operation: Box::new(operation),
         }),
     })
 }
@@ -98,25 +129,25 @@ where
 
 impl<T> Add for Tensor<T>
 where
-    T: Copy + Add<Output = T> + Default,
+    T: Copy + Add<Output = T> + Default + AddAssign,
 {
     type Output = Tensor<T>;
 
     /// Add two referenced tensors.
     fn add(self, rhs: Self) -> Self::Output {
-        compute_elementwise_tensor(self, rhs, |a, b| a + b, Operation::Add)
+        compute_elementwise_tensor(self, rhs, |a, b| a + b, AddOperation)
     }
 }
 
 impl<T> Add<T> for Tensor<T>
 where
-    T: Copy + Add<Output = T> + Default,
+    T: Copy + Add<Output = T> + Default + AddAssign,
 {
     type Output = Tensor<T>;
 
     /// Add a referenced tensor and a scalar.
     fn add(self, scalar: T) -> Self::Output {
-        compute_scalar_tensor(self, scalar, |a, b| a + b, Operation::Add)
+        compute_scalar_tensor(self, scalar, |a, b| a + b, AddOperation)
     }
 }
 
@@ -142,25 +173,25 @@ where
 
 impl<T> Sub for Tensor<T>
 where
-    T: Copy + Sub<Output = T> + Default,
+    T: Copy + Sub<Output = T> + Default + AddAssign + Neg<Output = T>,
 {
     type Output = Tensor<T>;
 
     /// Subtract two referenced tensors.
     fn sub(self, rhs: Self) -> Self::Output {
-        compute_elementwise_tensor(self, rhs, |a, b| a - b, Operation::Sub)
+        compute_elementwise_tensor(self, rhs, |a, b| a - b, SubOperation)
     }
 }
 
 impl<T> Sub<T> for Tensor<T>
 where
-    T: Copy + Sub<Output = T> + Default,
+    T: Copy + Sub<Output = T> + Default + AddAssign + Neg<Output = T>,
 {
     type Output = Tensor<T>;
 
     /// Subtract a scalar from a referenced tensor.
     fn sub(self, scalar: T) -> Self::Output {
-        compute_scalar_tensor(self, scalar, |a, b| a - b, Operation::Sub)
+        compute_scalar_tensor(self, scalar, |a, b| a - b, SubOperation)
     }
 }
 
@@ -186,25 +217,25 @@ where
 
 impl<T> Mul for Tensor<T>
 where
-    T: Copy + Mul<Output = T> + Default,
+    T: Copy + Mul<Output = T> + Default + AddAssign,
 {
     type Output = Tensor<T>;
 
     /// Multiply two tensors.
     fn mul(self, rhs: Self) -> Self::Output {
-        compute_elementwise_tensor(self, rhs, |a, b| a * b, Operation::Mul)
+        compute_elementwise_tensor(self, rhs, |a, b| a * b, MulOperation)
     }
 }
 
 impl<T> Mul<T> for Tensor<T>
 where
-    T: Copy + Mul<Output = T> + Default,
+    T: Copy + Mul<Output = T> + Default + AddAssign,
 {
     type Output = Tensor<T>;
 
     /// Multiply a tensor by a scalar.
     fn mul(self, scalar: T) -> Self::Output {
-        compute_scalar_tensor(self, scalar, |a, b| a * b, Operation::Mul)
+        compute_scalar_tensor(self, scalar, |a, b| a * b, MulOperation)
     }
 }
 
@@ -230,25 +261,25 @@ where
 
 impl<T> Div for Tensor<T>
 where
-    T: Copy + Div<Output = T> + Default,
+    T: Copy + Div<Output = T> + Default + AddAssign + Mul<Output = T> + Neg<Output = T>,
 {
     type Output = Tensor<T>;
 
     /// Divide two tensors.
     fn div(self, rhs: Self) -> Self::Output {
-        compute_elementwise_tensor(self, rhs, |a, b| a / b, Operation::Div)
+        compute_elementwise_tensor(self, rhs, |a, b| a / b, DivOperation)
     }
 }
 
 impl<T> Div<T> for Tensor<T>
 where
-    T: Copy + Div<Output = T> + Default,
+    T: Copy + Div<Output = T> + Default + AddAssign + Mul<Output = T> + Neg<Output = T>,
 {
     type Output = Tensor<T>;
 
     /// Divide a tensor by a scalar.
     fn div(self, scalar: T) -> Self::Output {
-        compute_scalar_tensor(self, scalar, |a, b| a / b, Operation::Div)
+        compute_scalar_tensor(self, scalar, |a, b| a / b, DivOperation)
     }
 }
 
@@ -269,6 +300,18 @@ where
     /// Divide all tensor elements by a scalar.
     fn div_assign(&mut self, rhs: T) {
         apply_scalar_assign(self, rhs, |a, b| a / b);
+    }
+}
+
+impl<T> Neg for Tensor<T>
+where
+    T: Neg<Output = T> + Copy + Default + AddAssign,
+{
+    type Output = Tensor<T>;
+
+    /// Negate all tensor elements.
+    fn neg(self) -> Self::Output {
+        compute_unary_tensor(self, |a| -a, NegateOperation)
     }
 }
 
