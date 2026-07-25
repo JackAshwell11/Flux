@@ -6,5 +6,5 @@ pub mod core;
 /// Tensor operations.
 pub mod ops;
 
-/// Tensor gradient functionality.
-pub mod grad;
+/// Automatic differentiation.
+pub mod autograd;
