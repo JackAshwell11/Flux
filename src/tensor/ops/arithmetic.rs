@@ -2,15 +2,8 @@ use crate::autograd::operations::{
     AddOperation, DivOperation, MulOperation, NegateOperation, SubOperation,
 };
 use crate::core::{Operation, OperationNode, Tensor, TensorState, next_tensor_id};
+use crate::tensor::broadcast::broadcast_forward;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
-
-/// Get the broadcasted value at a particular index.
-fn get_broadcast_value<T>(data: &[T], i: usize) -> T
-where
-    T: Copy,
-{
-    if data.len() == 1 { data[0] } else { data[i] }
-}
 
 /// Compute the resultant elementwise operation with two tensors.
 fn compute_elementwise_tensor<T, F, O>(
@@ -28,13 +21,13 @@ where
     let data = {
         let lhs_state = lhs.state.borrow();
         let rhs_state = rhs.state.borrow();
-        let mut data = Vec::with_capacity(size);
-        for i in 0..size {
-            let x = get_broadcast_value(&lhs_state.data, i);
-            let y = get_broadcast_value(&rhs_state.data, i);
-            data.push(f(x, y));
-        }
-        data
+        let lhs_data = broadcast_forward(&lhs_state.data, size);
+        let rhs_data = broadcast_forward(&rhs_state.data, size);
+        lhs_data
+            .iter()
+            .zip(rhs_data.iter())
+            .map(|(&x, &y)| f(x, y))
+            .collect()
     };
     Tensor::from_state(TensorState {
         id: next_tensor_id(),
@@ -109,9 +102,14 @@ where
 {
     let mut lhs_state = lhs.state.borrow_mut();
     let rhs_state = rhs.state.borrow();
-    for i in 0..lhs_state.data.len() {
-        lhs_state.data[i] = f(lhs_state.data[i], get_broadcast_value(&rhs_state.data, i));
-    }
+    let rhs_data = broadcast_forward(&rhs_state.data, lhs_state.data.len());
+    lhs_state
+        .data
+        .iter_mut()
+        .zip(rhs_data.iter())
+        .for_each(|(lhs_value, rhs_value)| {
+            *lhs_value = f(*lhs_value, *rhs_value);
+        });
 }
 
 /// Apply the resultant elementwise operation between a tensor and a scalar updating the left-hand

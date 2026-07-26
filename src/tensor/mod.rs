@@ -1,10 +1,13 @@
 //! Holds tensor-related functionality.
 
-/// Core tensor functionality.
-pub mod core;
+/// Automatic differentiation.
+pub mod autograd;
 
 /// Tensor operations.
 pub mod ops;
 
-/// Automatic differentiation.
-pub mod autograd;
+/// Broadcasting functionality.
+mod broadcast;
+
+/// Core tensor functionality.
+pub mod core;
