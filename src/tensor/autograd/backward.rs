@@ -1,16 +1,18 @@
 use crate::core::{Tensor, TensorState, next_tensor_id};
 use crate::tensor::autograd::graph::topological_sort;
+use crate::tensor::broadcast::broadcast_backward;
 use num_traits::One;
 use std::fmt::Debug;
 use std::ops::AddAssign;
 
 impl<T> Tensor<T>
 where
-    T: Copy + AddAssign,
+    T: Copy + AddAssign + Default,
 {
     /// Accumulates incoming gradients into this tensor's gradient.
-    pub fn set_grad(&self, incoming: &[T]) {
+    pub fn accumulate_grad(&self, incoming: &[T]) {
         let mut state = self.state.borrow_mut();
+        let incoming = broadcast_backward(incoming, state.grad.len());
         for (existing, incoming) in state.grad.iter_mut().zip(incoming.iter()) {
             *existing += *incoming;
         }
@@ -63,7 +65,13 @@ where
 
             // Apply the backward operation to this tensor's node
             if let Some(node) = tensor_state.node.as_ref() {
-                node.operation.backward(&output_grad, &node.parents);
+                node.parents
+                    .iter()
+                    .zip(node.operation.backward(&output_grad, &node.parents))
+                    .for_each(|(parent, grad)| {
+                        let state = grad.state.borrow();
+                        parent.accumulate_grad(&state.data)
+                    });
             }
         }
     }

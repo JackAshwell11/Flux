@@ -40,7 +40,7 @@ pub(crate) struct OperationNode<T> {
 /// Represents an operation on tensors.
 pub(crate) trait Operation<T>: Debug {
     /// Propagates the incoming gradient through the operation to its inputs.
-    fn backward(&self, incoming_grad: &Tensor<T>, parents: &[Tensor<T>]);
+    fn backward(&self, grad_output: &Tensor<T>, parents: &[Tensor<T>]) -> Vec<Tensor<T>>;
 }
 
 impl<T> Clone for Tensor<T> {

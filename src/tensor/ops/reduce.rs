@@ -41,7 +41,7 @@ where
 
 impl<T> Tensor<T>
 where
-    T: Float + Sum + Default + AddAssign + Debug + 'static,
+    T: Float + Sum + Default + AddAssign + Debug,
 {
     /// Compute the mean of a tensor.
     ///
@@ -50,11 +50,12 @@ where
     /// Panics if the tensor length cannot be converted to `T`.
     #[must_use]
     pub fn mean(&self) -> Self {
-        let (mean_val, len) = {
+        let (mean_val, size) = {
             let state = self.state.borrow();
             let sum: T = state.data.iter().copied().sum();
-            let len = T::from(state.data.len()).expect("Failed to convert length to Float");
-            (sum / len, len)
+            let size = state.data.len();
+            let len = T::from(size).expect("Failed to convert length to Float");
+            (sum / len, size)
         };
         Self::from_state(TensorState {
             id: next_tensor_id(),
@@ -63,9 +64,7 @@ where
             grad: vec![T::default(); 1],
             node: Some(OperationNode {
                 parents: vec![self.clone()],
-                operation: Box::new(MeanOperation {
-                    scale: T::one() / len,
-                }),
+                operation: Box::new(MeanOperation { size }),
             }),
         })
     }

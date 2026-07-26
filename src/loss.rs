@@ -8,7 +8,7 @@ use std::ops::AddAssign;
 #[must_use]
 pub fn l1_loss<T>(input: Tensor<T>, target: Tensor<T>) -> Tensor<T>
 where
-    T: Float + Sum + Default + AddAssign + Debug + 'static,
+    T: Float + Sum + Default + AddAssign + Debug,
 {
     (input - target).abs().mean()
 }
@@ -17,7 +17,7 @@ where
 #[must_use]
 pub fn l2_loss<T>(input: Tensor<T>, target: Tensor<T>) -> Tensor<T>
 where
-    T: Float + Sum + Default + AddAssign + Debug + 'static,
+    T: Float + Sum + Default + AddAssign + Debug,
 {
     let diff = input - target;
     let squared_diffs = diff.clone() * diff;
