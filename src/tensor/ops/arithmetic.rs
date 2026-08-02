@@ -406,14 +406,6 @@ mod tests {
         vec![0, 0, 0];
         "opposite values"
     )]
-    #[test_case(
-        [1],
-        [1],
-        [5, 10, 15],
-        [3],
-        vec![6];
-        "add scalar to tensor"
-    )]
     fn test_add_assign<const A: usize, const B: usize, const AS: usize, const BS: usize>(
         a: [i32; A],
         a_shape: [usize; AS],
@@ -425,6 +417,26 @@ mod tests {
         let tensor_two = Tensor::new(b, b_shape);
         tensor_one += tensor_two;
         assert_eq!(tensor_one.state.borrow().data, expected);
+    }
+
+    /// Test that the tensor addition assignment operator panics for unsupported sizes.
+    #[test_case(
+        [1],
+        [1],
+        [5, 10, 15],
+        [3];
+        "add scalar to tensor"
+    )]
+    #[should_panic]
+    fn test_add_assign_invalid<const A: usize, const B: usize, const AS: usize, const BS: usize>(
+        a: [i32; A],
+        a_shape: [usize; AS],
+        b: [i32; B],
+        b_shape: [usize; BS],
+    ) {
+        let mut tensor_one = Tensor::new(a, a_shape);
+        let tensor_two = Tensor::new(b, b_shape);
+        tensor_one += tensor_two;
     }
 
     /// Test that the tensor subtraction operator works correctly.
@@ -507,14 +519,6 @@ mod tests {
         vec![-2, -4, -6];
         "negative values"
     )]
-    #[test_case(
-        [10],
-        [1],
-        [3, 4, 5],
-        [3],
-        vec![7];
-        "scalar subtraction from tensor"
-    )]
     fn test_sub_assign<const A: usize, const B: usize, const AS: usize, const BS: usize>(
         a: [i32; A],
         a_shape: [usize; AS],
@@ -526,6 +530,26 @@ mod tests {
         let tensor_two = Tensor::new(b, b_shape);
         tensor_one -= tensor_two;
         assert_eq!(tensor_one.state.borrow().data, expected);
+    }
+
+    /// Test that the tensor subtraction assignment operator panics for unsupported sizes.
+    #[test_case(
+        [10],
+        [1],
+        [3, 4, 5],
+        [3];
+        "scalar subtraction from tensor"
+    )]
+    #[should_panic]
+    fn test_sub_assign_invalid<const A: usize, const B: usize, const AS: usize, const BS: usize>(
+        a: [i32; A],
+        a_shape: [usize; AS],
+        b: [i32; B],
+        b_shape: [usize; BS],
+    ) {
+        let mut tensor_one = Tensor::new(a, a_shape);
+        let tensor_two = Tensor::new(b, b_shape);
+        tensor_one -= tensor_two;
     }
 
     /// Test that the tensor multiplication operator works correctly.
@@ -608,14 +632,6 @@ mod tests {
         vec![-1, -4, -9];
         "negative values"
     )]
-    #[test_case(
-        [10],
-        [1],
-        [3, 4, 5],
-        [3],
-        vec![30];
-        "scalar multiplication"
-    )]
     fn test_mul_assign<const A: usize, const B: usize, const AS: usize, const BS: usize>(
         a: [i32; A],
         a_shape: [usize; AS],
@@ -627,6 +643,26 @@ mod tests {
         let tensor_two = Tensor::new(b, b_shape);
         tensor_one *= tensor_two;
         assert_eq!(tensor_one.state.borrow().data, expected);
+    }
+
+    /// Test that the tensor multiplication assignment operator panics for unsupported sizes.
+    #[test_case(
+        [10],
+        [1],
+        [3, 4, 5],
+        [3];
+        "scalar multiplication"
+    )]
+    #[should_panic]
+    fn test_mul_assign_invalid<const A: usize, const B: usize, const AS: usize, const BS: usize>(
+        a: [i32; A],
+        a_shape: [usize; AS],
+        b: [i32; B],
+        b_shape: [usize; BS],
+    ) {
+        let mut tensor_one = Tensor::new(a, a_shape);
+        let tensor_two = Tensor::new(b, b_shape);
+        tensor_one *= tensor_two;
     }
 
     /// Test that the tensor division operator works correctly (integer division).
@@ -709,14 +745,6 @@ mod tests {
         vec![-5, -10, -15];
         "negative values"
     )]
-    #[test_case(
-        [50],
-        [1],
-        [5, 10, 25],
-        [3],
-        vec![10];
-        "scalar division"
-    )]
     fn test_div_assign<const A: usize, const B: usize, const AS: usize, const BS: usize>(
         a: [i32; A],
         a_shape: [usize; AS],
@@ -728,5 +756,25 @@ mod tests {
         let tensor_two = Tensor::new(b, b_shape);
         tensor_one /= tensor_two;
         assert_eq!(tensor_one.state.borrow().data, expected);
+    }
+
+    /// Test that the tensor division assignment operator panics for unsupported sizes.
+    #[test_case(
+        [50],
+        [1],
+        [5, 10, 25],
+        [3];
+        "scalar division"
+    )]
+    #[should_panic]
+    fn test_div_assign_invalid<const A: usize, const B: usize, const AS: usize, const BS: usize>(
+        a: [i32; A],
+        a_shape: [usize; AS],
+        b: [i32; B],
+        b_shape: [usize; BS],
+    ) {
+        let mut tensor_one = Tensor::new(a, a_shape);
+        let tensor_two = Tensor::new(b, b_shape);
+        tensor_one /= tensor_two;
     }
 }

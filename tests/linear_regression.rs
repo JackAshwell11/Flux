@@ -1,5 +1,5 @@
 use flux::loss::l2_loss;
-use flux::tensor::Tensor;
+use flux::tensor::core::Tensor;
 
 /// Controls the number of iterations to run the training loop for.
 const ITERATIONS: usize = 10000;
@@ -19,6 +19,15 @@ const EXPECTED_INTERCEPT: f32 = 1.0;
 /// Controls the tolerance for the test.
 const EPSILON: f32 = 1e-4;
 
+/// Performs an in-place stochastic gradient descent (SGD) update:
+///     data -= lr * grad
+pub fn gradient_descent_step(param: &mut Tensor<f32>) {
+    let mut state = param.state.borrow_mut();
+    for i in 0..state.data.len() {
+        state.data[i] -= LEARNING_RATE * state.grad[i];
+    }
+}
+
 /// Test that the linear regression algorithm works correctly.
 #[test]
 fn test_linear_regression() {
@@ -36,21 +45,23 @@ fn test_linear_regression() {
     // Run the gradient descent algorithm
     for _ in 0..ITERATIONS {
         // Calculate the predicted output
-        let y_pred = &x_tensor * &gradient + &y_intercept;
+        let y_pred = x_tensor.clone() * gradient.clone() + y_intercept.clone();
 
-        // Compute the loss function and check that its decreasing
-        let current_loss = l2_loss(&y_pred, &y_tensor).get(0);
-        assert!(current_loss <= previous_loss + LOSS_TOLERANCE);
-        previous_loss = current_loss;
+        // Compute the loss function and check that it's decreasing
+        let loss = l2_loss(y_pred.clone(), y_tensor.clone());
+        assert!(loss.get(0) <= previous_loss + LOSS_TOLERANCE);
+        previous_loss = loss.get(0);
 
-        // Compute the gradient of the loss function
-        let difference = &y_pred - &y_tensor;
-        let gradient_derivative = (&x_tensor * &difference).mean();
-        let intercept_derivative = difference.mean();
+        // Compute the backward pass to calculate the gradients
+        loss.backward();
 
         // Update the weights using the gradient descent algorithm
-        gradient -= &gradient_derivative * LEARNING_RATE;
-        y_intercept -= &intercept_derivative * LEARNING_RATE;
+        gradient_descent_step(&mut gradient);
+        gradient_descent_step(&mut y_intercept);
+
+        // Zero the gradients to prepare for the next iteration
+        gradient.zero_grad();
+        y_intercept.zero_grad();
     }
 
     // Check that the output is correct
