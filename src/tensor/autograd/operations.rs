@@ -110,3 +110,116 @@ where
         vec![-grad_output.clone()]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::Tensor;
+    use test_case::test_case;
+
+    /// Test that the addition operation computes correct gradients.
+    #[test_case([2.0], [[2.0], [2.0]]; "scalar")]
+    #[test_case([2.0, 3.0], [[2.0, 3.0], [2.0, 3.0]]; "vector")]
+    fn test_add_backward<const N: usize>(grad_output: [f32; N], expected: [[f32; N]; 2]) {
+        let grad_output = Tensor::new(grad_output, [N]);
+        let gradients = AddOperation.backward(&grad_output, &[]);
+        assert_eq!(gradients[0].state.borrow().data, expected[0]);
+        assert_eq!(gradients[1].state.borrow().data, expected[1]);
+    }
+
+    /// Test that the subtraction operation computes correct gradients.
+    #[test_case([2.0], [[2.0], [-2.0]]; "scalar")]
+    #[test_case([2.0, 3.0], [[2.0, 3.0], [-2.0, -3.0]]; "vector")]
+    fn test_sub_backward<const N: usize>(grad_output: [f32; N], expected: [[f32; N]; 2]) {
+        let grad_output = Tensor::new(grad_output, [N]);
+        let gradients = SubOperation.backward(&grad_output, &[]);
+        assert_eq!(gradients[0].state.borrow().data, expected[0]);
+        assert_eq!(gradients[1].state.borrow().data, expected[1]);
+    }
+
+    /// Test that the multiplication operation computes correct gradients.
+    #[test_case(
+        [2.0],
+        [3.0],
+        [1.0],
+        [[3.0], [2.0]];
+        "scalar"
+    )]
+    #[test_case(
+        [2.0, 4.0],
+        [3.0, 5.0],
+        [1.0, 1.0],
+        [[3.0, 5.0], [2.0, 4.0]];
+        "vector"
+    )]
+    fn test_mul_backward<const N: usize>(
+        lhs: [f32; N],
+        rhs: [f32; N],
+        grad_output: [f32; N],
+        expected: [[f32; N]; 2],
+    ) {
+        let lhs = Tensor::new(lhs, [N]);
+        let rhs = Tensor::new(rhs, [N]);
+        let grad_output = Tensor::new(grad_output, [N]);
+        let gradients = MulOperation.backward(&grad_output, &[lhs, rhs]);
+        assert_eq!(gradients[0].state.borrow().data, expected[0]);
+        assert_eq!(gradients[1].state.borrow().data, expected[1]);
+    }
+
+    /// Test that the division operation computes correct gradients.
+    #[test_case(
+        [6.0],
+        [2.0],
+        [1.0],
+        [[0.5], [-1.5]];
+        "scalar"
+    )]
+    #[test_case(
+        [8.0, 9.0],
+        [2.0, 3.0],
+        [1.0, 1.0],
+        [[0.5, 0.33333334], [-2.0, -1.0]];
+        "vector"
+    )]
+    fn test_div_backward<const N: usize>(
+        lhs: [f32; N],
+        rhs: [f32; N],
+        grad_output: [f32; N],
+        expected: [[f32; N]; 2],
+    ) {
+        let lhs = Tensor::new(lhs, [N]);
+        let rhs = Tensor::new(rhs, [N]);
+        let grad_output = Tensor::new(grad_output, [N]);
+        let gradients = DivOperation.backward(&grad_output, &[lhs, rhs]);
+        assert_eq!(gradients[0].state.borrow().data, expected[0]);
+        assert_eq!(gradients[1].state.borrow().data, expected[1]);
+    }
+
+    /// Test that the mean operation computes correct gradients.
+    #[test_case(
+        2,
+        [1.0, 1.0],
+        [0.5, 0.5];
+        "two elements"
+    )]
+    #[test_case(
+        4,
+        [1.0, 1.0, 1.0, 1.0],
+        [0.25, 0.25, 0.25, 0.25];
+        "four elements"
+    )]
+    fn test_mean_backward<const N: usize>(size: usize, grad_output: [f32; N], expected: [f32; N]) {
+        let grad_output = Tensor::new(grad_output, [N]);
+        let gradients = MeanOperation { size }.backward(&grad_output, &[]);
+        assert_eq!(gradients[0].state.borrow().data, expected);
+    }
+
+    /// Test that the negation operation computes correct gradients.
+    #[test_case([2.0], [-2.0]; "scalar")]
+    #[test_case([2.0, -3.0], [-2.0, 3.0]; "vector")]
+    fn test_neg_backward<const N: usize>(grad_output: [f32; N], expected: [f32; N]) {
+        let grad_output = Tensor::new(grad_output, [N]);
+        let gradients = NegateOperation.backward(&grad_output, &[]);
+        assert_eq!(gradients[0].state.borrow().data, expected);
+    }
+}

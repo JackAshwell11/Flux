@@ -48,3 +48,57 @@ where
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_case::test_case;
+
+    /// Test that broadcasting forwards works correctly.
+    #[test_case([1.0, 2.0, 3.0], 3, vec![1.0, 2.0, 3.0]; "matching vector size")]
+    #[test_case([10.0], 1, vec![10.0]; "matching scalar size")]
+    #[test_case([-1.0, -2.0, -3.0, -4.0], 4, vec![-1.0, -2.0, -3.0, -4.0]; "matching negative size")]
+    #[test_case([5.0], 3, vec![5.0, 5.0, 5.0]; "scalar to vector")]
+    #[test_case([-2.0], 4, vec![-2.0, -2.0, -2.0, -2.0]; "negative scalar to vector")]
+    fn test_broadcast_forward<const N: usize>(
+        data: [f32; N],
+        target_size: usize,
+        expected: Vec<f32>,
+    ) {
+        assert_eq!(broadcast_forward(&data, target_size), expected);
+    }
+
+    /// Test that broadcasting forwards panics for unsupported sizes.
+    #[test_case([1.0, 2.0], 3; "larger target size")]
+    #[test_case([1.0, 2.0, 3.0], 2; "smaller target size")]
+    #[should_panic]
+    fn test_broadcast_forward_invalid<const N: usize>(data: [f32; N], target_size: usize) {
+        let _ = broadcast_forward(&data, target_size);
+    }
+
+    /// Test that broadcasting backwards works correctly,
+    #[test_case([1.0, 2.0, 3.0], 3, vec![1.0, 2.0, 3.0]; "matching vector gradient")]
+    #[test_case([10.0], 1, vec![10.0]; "matching scalar gradient")]
+    #[test_case([-1.0, -2.0, -3.0, -4.0], 4, vec![-1.0, -2.0, -3.0, -4.0]; "matching negative gradient")]
+    #[test_case([-5.0], 3, vec![-5.0, -5.0, -5.0]; "matching negative scalar gradient")]
+    #[test_case([1.0, 2.0, 3.0], 1, vec![6.0]; "sum vector into scalar")]
+    #[test_case([-1.0, -2.0, -3.0, -4.0], 1, vec![-10.0]; "sum negative into scalar")]
+    #[test_case([5.0, 5.0], 1, vec![10.0]; "sum repeated gradients")]
+    #[test_case([5.0], 3, vec![5.0, 5.0, 5.0]; "expand scalar scalar gradients")]
+    #[test_case([-2.0], 4, vec![-2.0, -2.0, -2.0, -2.0]; "expand negative scalar gradients")]
+    fn test_broadcast_backward<const N: usize>(
+        grad: [f32; N],
+        parent_size: usize,
+        expected: Vec<f32>,
+    ) {
+        assert_eq!(broadcast_backward(&grad, parent_size), expected);
+    }
+
+    /// Test that broadcasting backward panic for unsupported sizes.
+    #[test_case([1.0, 2.0], 3; "larger parent size")]
+    #[test_case([1.0, 2.0, 3.0], 2; "smaller parent size")]
+    #[should_panic]
+    fn test_broadcast_backward_invalid<const N: usize>(grad: [f32; N], parent_size: usize) {
+        let _ = broadcast_backward(&grad, parent_size);
+    }
+}
