@@ -45,72 +45,72 @@ mod tests {
         [1, 2, 3],
         [4, 5, 6],
         [3],
-        vec![32],
-        vec![];
+        [32],
+        [];
         "basic"
     )]
     #[test_case(
         [0, 0, 0],
         [1, 2, 3],
         [3],
-        vec![0],
-        vec![];
+        [0],
+        [];
         "zero vector"
     )]
     #[test_case(
         [1, 1, 1],
         [1, 1, 1],
         [3],
-        vec![3],
-        vec![];
+        [3],
+        [];
         "ones"
     )]
     #[test_case(
         [2, 3, 4],
         [5, 6, 7],
         [3],
-        vec![56],
-        vec![];
+        [56],
+        [];
         "small integers"
     )]
     #[test_case(
         [-1, -2, -3],
         [1, 2, 3],
         [3],
-        vec![-14],
-        vec![];
+        [-14],
+        [];
         "negatives"
     )]
     #[test_case(
         [1, -2, 3],
         [-4, 5, -6],
         [3],
-        vec![-32],
-        vec![];
+        [-32],
+        [];
         "mixed signs"
     )]
     #[test_case(
         [10],
         [7],
         [1],
-        vec![70],
-        vec![];
+        [70],
+        [];
         "single element"
     )]
     #[test_case(
         [1, 2, 3, 4],
         [4, 3, 2, 1],
         [4],
-        vec![20],
-        vec![];
+        [20],
+        [];
         "reversed"
     )]
-    fn test_dot<const N: usize, const S: usize>(
+    fn test_dot<const N: usize, const S: usize, const ED: usize, const ES: usize>(
         a: [i32; N],
         b: [i32; N],
         shape: [usize; S],
-        expected_data: Vec<i32>,
-        expected_shape: Vec<usize>,
+        expected_data: [i32; ED],
+        expected_shape: [usize; ES],
     ) {
         let tensor_one = Tensor::new(a, shape);
         let tensor_two = Tensor::new(b, shape);

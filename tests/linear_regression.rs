@@ -24,7 +24,7 @@ const EPSILON: f32 = 1e-4;
 pub fn gradient_descent_step(param: &mut Tensor<f32>) {
     let mut state = param.state.borrow_mut();
     for i in 0..state.data.len() {
-        state.data[i] -= LEARNING_RATE * state.grad[i];
+        state.data[i] = LEARNING_RATE.mul_add(-state.grad[i], state.data[i]);
     }
 }
 
