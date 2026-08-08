@@ -1,5 +1,5 @@
-use crate::autograd::operations::MeanOperation;
-use crate::core::{OperationNode, Tensor, TensorState, next_tensor_id};
+use crate::tensor::autograd::operations::MeanOperation;
+use crate::tensor::core::{OperationNode, Tensor, TensorState, next_tensor_id};
 use num_traits::Float;
 use std::fmt::Debug;
 use std::iter::Sum;

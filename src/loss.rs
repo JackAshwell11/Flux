@@ -1,4 +1,4 @@
-use crate::core::Tensor;
+use crate::tensor::core::Tensor;
 use num_traits::Float;
 use std::fmt::Debug;
 use std::iter::Sum;

@@ -1,5 +1,5 @@
-use crate::core::{TensorState, next_tensor_id};
 use crate::tensor::core::Tensor;
+use crate::tensor::core::{TensorState, next_tensor_id};
 use std::ops::{Add, Mul};
 
 impl<T> Tensor<T> {

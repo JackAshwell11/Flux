@@ -1,4 +1,4 @@
-use crate::core::{Operation, Tensor};
+use crate::tensor::core::{Operation, Tensor};
 use num_traits::{NumCast, One};
 use std::fmt::Debug;
 use std::ops::{AddAssign, Div, Mul, Neg};
@@ -114,7 +114,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::Tensor;
+    use crate::tensor::core::Tensor;
     use test_case::test_case;
 
     /// Test that the addition operation computes correct gradients.

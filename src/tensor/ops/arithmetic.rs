@@ -1,8 +1,8 @@
-use crate::autograd::operations::{
+use crate::tensor::autograd::operations::{
     AddOperation, DivOperation, MulOperation, NegateOperation, SubOperation,
 };
-use crate::core::{Operation, OperationNode, Tensor, TensorState, next_tensor_id};
 use crate::tensor::broadcast::broadcast_forward;
+use crate::tensor::core::{Operation, OperationNode, Tensor, TensorState, next_tensor_id};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 /// Compute the resultant elementwise operation with two tensors.

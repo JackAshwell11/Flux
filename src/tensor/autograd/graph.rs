@@ -1,4 +1,4 @@
-use crate::core::Tensor;
+use crate::tensor::core::Tensor;
 use std::collections::HashSet;
 use std::fmt::Debug;
 
@@ -94,8 +94,8 @@ pub(crate) fn topological_sort<T>(tensor: &Tensor<T>) -> Vec<Tensor<T>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::autograd::operations::AddOperation;
-    use crate::core::{OperationNode, Tensor};
+    use crate::tensor::autograd::operations::AddOperation;
+    use crate::tensor::core::{OperationNode, Tensor};
     use std::collections::HashSet;
     use test_case::test_case;
 

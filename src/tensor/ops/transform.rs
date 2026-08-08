@@ -1,4 +1,4 @@
-use crate::core::{Tensor, TensorState, next_tensor_id};
+use crate::tensor::core::{Tensor, TensorState, next_tensor_id};
 
 impl<T> Tensor<T>
 where

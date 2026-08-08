@@ -1,6 +1,6 @@
-use crate::core::{Tensor, TensorState, next_tensor_id};
 use crate::tensor::autograd::graph::topological_sort;
 use crate::tensor::broadcast::broadcast_backward;
+use crate::tensor::core::{Tensor, TensorState, next_tensor_id};
 use num_traits::One;
 use std::fmt::Debug;
 use std::ops::AddAssign;
