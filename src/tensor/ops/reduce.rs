@@ -29,11 +29,19 @@ where
     /// Compute the absolute value of a tensor.
     #[must_use]
     pub fn abs(&self) -> Self {
+        let (data, shape) = {
+            let state = self.state.borrow();
+            (
+                state.data.iter().map(|x| x.abs()).collect::<Vec<_>>(),
+                state.shape.clone(),
+            )
+        };
+        let num_elements = data.len();
         Self::from_state(TensorState {
             id: next_tensor_id(),
-            data: self.state.borrow().data.iter().map(|x| x.abs()).collect(),
-            shape: self.state.borrow().shape.clone(),
-            grad: vec![T::default(); 1],
+            data,
+            shape,
+            grad: vec![T::default(); num_elements],
             node: None,
         })
     }
@@ -74,7 +82,7 @@ impl<T> Tensor<T>
 where
     T: Copy + PartialOrd + Default,
 {
-    /// Compute the minimum or maximum value between two values in an iterator.
+    /// Compute the minimum or maximum value in the iterator and return it as a scalar tensor.
     fn compute_min_max(&self, comparator: impl Fn(T, T) -> bool) -> Self {
         let result = self
             .state
@@ -112,17 +120,17 @@ mod tests {
     use test_case::test_case;
 
     /// Test that summing tensor elements works correctly.
-    #[test_case([1, 2, 3], [3], vec![6], vec![]; "positive vector")]
-    #[test_case([0, 0, 0], [3], vec![0], vec![]; "all zeros")]
-    #[test_case([-1, -2, -3], [3], vec![-6], vec![]; "negative vector")]
-    #[test_case([-1, 2, -3, 4], [4], vec![2], vec![]; "mixed signs")]
-    #[test_case([42], [1], vec![42], vec![]; "single element")]
-    #[test_case([1, 2, 3, 4], [2, 2], vec![10], vec![]; "matrix")]
-    fn test_sum<const N: usize, const S: usize>(
+    #[test_case([1, 2, 3], [3], [6], []; "positive vector")]
+    #[test_case([0, 0, 0], [3], [0], []; "all zeros")]
+    #[test_case([-1, -2, -3], [3], [-6], []; "negative vector")]
+    #[test_case([-1, 2, -3, 4], [4], [2], []; "mixed signs")]
+    #[test_case([42], [1], [42], []; "single element")]
+    #[test_case([1, 2, 3, 4], [2, 2], [10], []; "matrix")]
+    fn test_sum<const N: usize, const S: usize, const ED: usize, const ES: usize>(
         data: [i32; N],
         shape: [usize; S],
-        expected_data: Vec<i32>,
-        expected_shape: Vec<usize>,
+        expected_data: [i32; ED],
+        expected_shape: [usize; ES],
     ) {
         let tensor = Tensor::new(data, shape);
         let summed = tensor.sum();
@@ -131,15 +139,15 @@ mod tests {
     }
 
     /// Test that computing the mean of tensors works correctly.
-    #[test_case([1.0, 2.0, 3.0], [3], vec![2.0], vec![]; "simple float mean")]
-    #[test_case([1.0, 2.0, 3.0, 4.0], [4], vec![2.5], vec![]; "fractional float mean")]
-    #[test_case([-1.0, 1.0], [2], vec![0.0], vec![]; "opposite floats")]
-    #[test_case([2.5], [1], vec![2.5], vec![]; "single float")]
-    fn test_mean<const N: usize, const S: usize>(
-        data: [f64; N],
+    #[test_case([1.0, 2.0, 3.0], [3], [2.0], []; "simple float mean")]
+    #[test_case([1.0, 2.0, 3.0, 4.0], [4], [2.5], []; "fractional float mean")]
+    #[test_case([-1.0, 1.0], [2], [0.0], []; "opposite floats")]
+    #[test_case([2.5], [1], [2.5], []; "single float")]
+    fn test_mean<const N: usize, const S: usize, const ED: usize, const ES: usize>(
+        data: [f32; N],
         shape: [usize; S],
-        expected_data: Vec<f64>,
-        expected_shape: Vec<usize>,
+        expected_data: [f32; ED],
+        expected_shape: [usize; ES],
     ) {
         let tensor = Tensor::new(data, shape);
         let mean_tensor = tensor.mean();
@@ -148,17 +156,17 @@ mod tests {
     }
 
     /// Test that getting the min of a tensor works correctly.
-    #[test_case([1, 2, 3], [3], vec![1], vec![]; "ascending")]
-    #[test_case([3, 2, 1], [3], vec![1], vec![]; "descending")]
-    #[test_case([-10, -5, -20], [3], vec![-20], vec![]; "negative values")]
-    #[test_case([-1, 0, 1], [3], vec![-1], vec![]; "mixed signs")]
-    #[test_case([42], [1], vec![42], vec![]; "single element")]
-    #[test_case([1, 9, 3, 7], [2, 2], vec![1], vec![]; "matrix")]
-    fn test_min<const N: usize, const S: usize>(
+    #[test_case([1, 2, 3], [3], [1], []; "ascending")]
+    #[test_case([3, 2, 1], [3], [1], []; "descending")]
+    #[test_case([-10, -5, -20], [3], [-20], []; "negative values")]
+    #[test_case([-1, 0, 1], [3], [-1], []; "mixed signs")]
+    #[test_case([42], [1], [42], []; "single element")]
+    #[test_case([1, 9, 3, 7], [2, 2], [1], []; "matrix")]
+    fn test_min<const N: usize, const S: usize, const ED: usize, const ES: usize>(
         data: [i32; N],
         shape: [usize; S],
-        expected_data: Vec<i32>,
-        expected_shape: Vec<usize>,
+        expected_data: [i32; ED],
+        expected_shape: [usize; ES],
     ) {
         let tensor = Tensor::new(data, shape);
         let min_tensor = tensor.min();
@@ -167,17 +175,17 @@ mod tests {
     }
 
     /// Test that getting the max of a tensor works correctly.
-    #[test_case([1, 2, 3], [3], vec![3], vec![]; "ascending")]
-    #[test_case([3, 2, 1], [3], vec![3], vec![]; "descending")]
-    #[test_case([-10, -5, -20], [3], vec![-5], vec![]; "negative values")]
-    #[test_case([-1, 0, 1], [3], vec![1], vec![]; "mixed signs")]
-    #[test_case([42], [1], vec![42], vec![]; "single element")]
-    #[test_case([1, 9, 3, 7], [2, 2], vec![9], vec![]; "matrix")]
-    fn test_max<const N: usize, const S: usize>(
+    #[test_case([1, 2, 3], [3], [3], []; "ascending")]
+    #[test_case([3, 2, 1], [3], [3], []; "descending")]
+    #[test_case([-10, -5, -20], [3], [-5], []; "negative values")]
+    #[test_case([-1, 0, 1], [3], [1], []; "mixed signs")]
+    #[test_case([42], [1], [42], []; "single element")]
+    #[test_case([1, 9, 3, 7], [2, 2], [9], []; "matrix")]
+    fn test_max<const N: usize, const S: usize, const ED: usize, const ES: usize>(
         data: [i32; N],
         shape: [usize; S],
-        expected_data: Vec<i32>,
-        expected_shape: Vec<usize>,
+        expected_data: [i32; ED],
+        expected_shape: [usize; ES],
     ) {
         let tensor = Tensor::new(data, shape);
         let max_tensor = tensor.max();

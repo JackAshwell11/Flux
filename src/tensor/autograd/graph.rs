@@ -5,7 +5,7 @@ use std::fmt::Debug;
 /// Recursively walk a tensor computation graph and apply both a pre-order and post-order function
 /// on each node in the graph.
 fn walk_graph<T, Pre, Post>(
-    tensor: Tensor<T>,
+    tensor: &Tensor<T>,
     visited: &mut HashSet<usize>,
     depth: usize,
     pre_order: &mut Pre,
@@ -20,22 +20,23 @@ fn walk_graph<T, Pre, Post>(
     }
 
     // Get the tensor and apply the pre-order graph operation
-    pre_order(&tensor, depth);
+    pre_order(tensor, depth);
 
     // Visit the node's parents if it exists
     let parents = {
         let tensor_state = tensor.state.borrow();
-        match &tensor_state.node {
-            Some(node) => node.parents.clone(),
-            None => Vec::new(),
-        }
+        tensor_state
+            .node
+            .as_ref()
+            .map(|node| node.parents.clone())
+            .unwrap_or_default()
     };
     for parent in parents {
-        walk_graph(parent, visited, depth + 1, pre_order, post_order);
+        walk_graph(&parent, visited, depth + 1, pre_order, post_order);
     }
 
     // Apply the post-order graph operation
-    post_order(&tensor);
+    post_order(tensor);
 }
 
 impl<T> Tensor<T>
@@ -51,7 +52,7 @@ where
         let mut output = String::new();
         let mut visited = HashSet::new();
         walk_graph(
-            self.clone(),
+            &self.clone(),
             &mut visited,
             0,
             &mut |tensor, depth| {
@@ -81,7 +82,7 @@ where
 }
 
 /// Get a topologically sorted list of the tensor's dependencies.
-pub(crate) fn topological_sort<T>(tensor: Tensor<T>) -> Vec<Tensor<T>> {
+pub(crate) fn topological_sort<T>(tensor: &Tensor<T>) -> Vec<Tensor<T>> {
     let mut visited = HashSet::new();
     let mut order = Vec::new();
     walk_graph(tensor, &mut visited, 0, &mut |_, _| {}, &mut |tensor| {
@@ -119,8 +120,8 @@ mod tests {
     /// Test that walking the graph is performed correctly.
     #[test_case(
         vec![(Tensor::new([1.0], [1]), vec![])],
-        vec![0],
-        vec![0];
+        [0],
+        [0];
         "single tensor graph"
     )]
     #[test_case(
@@ -129,8 +130,8 @@ mod tests {
             (Tensor::new([2.0], [1]), vec![]),
             (Tensor::new([3.0], [1]), vec![0, 1]),
         ],
-        vec![2, 0, 1],
-        vec![0, 1, 2];
+        [2, 0, 1],
+        [0, 1, 2];
         "three node DAG"
     )]
     #[test_case(
@@ -140,20 +141,20 @@ mod tests {
             (Tensor::new([3.0], [1]), vec![0, 1]),
             (Tensor::new([4.0], [1]), vec![2, 1]),
         ],
-        vec![3, 2, 0, 1],
-        vec![0, 1, 2, 3];
+        [3, 2, 0, 1],
+        [0, 1, 2, 3];
         "four node complex DAG"
     )]
-    fn test_walk_graph(
+    fn test_walk_graph<const PRE: usize, const POST: usize>(
         nodes: Vec<(Tensor<f32>, Vec<usize>)>,
-        expected_pre_indices: Vec<usize>,
-        expected_post_indices: Vec<usize>,
+        expected_pre_indices: [usize; PRE],
+        expected_post_indices: [usize; POST],
     ) {
         let tensors = build_test_graph(nodes);
         let mut pre_order = vec![];
         let mut post_order = vec![];
         walk_graph(
-            tensors.last().unwrap().clone(),
+            &tensors.last().unwrap().clone(),
             &mut HashSet::new(),
             0,
             &mut |tensor, _| pre_order.push(tensor.clone()),
@@ -180,7 +181,7 @@ mod tests {
     fn test_print_graph() {
         let tensor_a: Tensor<f32> = Tensor::new([1.0, 2.0], [2]);
         let tensor_b: Tensor<f32> = Tensor::new([3.0, 4.0], [2]);
-        let tensor_c = tensor_a.clone() * tensor_b.clone();
+        let tensor_c = tensor_a * tensor_b;
         let expected_output = format!(
             "Node {} MulOperation├── Leaf [1.0, 2.0]├── Leaf [3.0, 4.0]",
             tensor_c.state.borrow().id
@@ -191,7 +192,7 @@ mod tests {
     /// Test that a tensor graph can be sorted topologically correctly.
     #[test_case(
         vec![(Tensor::new([1.0], [1]), vec![])],
-        vec![0];
+        [0];
         "single tensor graph"
     )]
     #[test_case(
@@ -200,7 +201,7 @@ mod tests {
             (Tensor::new([2.0], [1]), vec![]),
             (Tensor::new([3.0], [1]), vec![0, 1]),
         ],
-        vec![0, 1, 2];
+        [0, 1, 2];
         "three node DAG"
     )]
     #[test_case(
@@ -210,7 +211,7 @@ mod tests {
             (Tensor::new([3.0], [1]), vec![0, 1]),
             (Tensor::new([4.0], [1]), vec![2, 1]),
         ],
-        vec![0, 1, 2, 3];
+        [0, 1, 2, 3];
         "four node complex DAG"
     )]
     #[test_case(
@@ -221,7 +222,7 @@ mod tests {
             (Tensor::new([4.0], [1]), vec![2]),
             (Tensor::new([5.0], [1]), vec![2, 3]),
         ],
-        vec![0, 1, 2, 3, 4];
+        [0, 1, 2, 3, 4];
         "complex multi-branch DAG"
     )]
     #[test_case(
@@ -232,15 +233,15 @@ mod tests {
             (Tensor::new([4.0], [1]), vec![1, 2]),
             (Tensor::new([5.0], [1]), vec![3, 0]),
         ],
-        vec![0, 1, 2, 3, 4];
+        [0, 1, 2, 3, 4];
         "diamond dependency DAG with shared leaf"
     )]
-    fn test_topological_sort(
+    fn test_topological_sort<const E: usize>(
         nodes: Vec<(Tensor<f32>, Vec<usize>)>,
-        expected_sorted_indices: Vec<usize>,
+        expected_sorted_indices: [usize; E],
     ) {
         let tensors = build_test_graph(nodes);
-        let sorted_tensors = topological_sort(tensors.last().unwrap().clone());
+        let sorted_tensors = topological_sort(&tensors.last().unwrap().clone());
         assert_eq!(
             sorted_tensors,
             expected_sorted_indices

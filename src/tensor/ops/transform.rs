@@ -59,22 +59,22 @@ mod tests {
     }
 
     /// Test that mapping integer tensors applies the function to every element and preserves shape.
-    #[test_case([1, 2, 3, 4], [4], double, vec![2, 4, 6, 8], vec![4]; "double one-dimensional tensor")]
-    #[test_case([1, 2, 3, 4], [2, 2], double, vec![2, 4, 6, 8], vec![2, 2]; "double two-dimensional tensor")]
-    #[test_case([-2, -1, 0, 1, 2], [5], double, vec![-4, -2, 0, 2, 4], vec![5]; "double mixed signs")]
-    #[test_case([0], [1], double, vec![0], vec![1]; "double single zero")]
-    #[test_case([1, 2, 3], [3], increment, vec![2, 3, 4], vec![3]; "increment vector")]
-    #[test_case([1, 2, 3, 4, 5, 6], [2, 3], increment, vec![2, 3, 4, 5, 6, 7], vec![2, 3]; "increment matrix")]
-    #[test_case([-3, -2, -1], [3], increment, vec![-2, -1, 0], vec![3]; "increment negative values")]
-    #[test_case([1, 2, 3, 4], [4], square, vec![1, 4, 9, 16], vec![4]; "square vector")]
-    #[test_case([-3, -2, -1, 0, 1, 2, 3], [7], square, vec![9, 4, 1, 0, 1, 4, 9], vec![7]; "square mixed signs")]
-    #[test_case([2, 3, 4, 5], [2, 2], square, vec![4, 9, 16, 25], vec![2, 2]; "square matrix")]
-    fn test_map_i32<const N: usize, const S: usize>(
+    #[test_case([1, 2, 3, 4], [4], double, [2, 4, 6, 8], [4]; "double one-dimensional tensor")]
+    #[test_case([1, 2, 3, 4], [2, 2], double, [2, 4, 6, 8], [2, 2]; "double two-dimensional tensor")]
+    #[test_case([-2, -1, 0, 1, 2], [5], double, [-4, -2, 0, 2, 4], [5]; "double mixed signs")]
+    #[test_case([0], [1], double, [0], [1]; "double single zero")]
+    #[test_case([1, 2, 3], [3], increment, [2, 3, 4], [3]; "increment vector")]
+    #[test_case([1, 2, 3, 4, 5, 6], [2, 3], increment, [2, 3, 4, 5, 6, 7], [2, 3]; "increment matrix")]
+    #[test_case([-3, -2, -1], [3], increment, [-2, -1, 0], [3]; "increment negative values")]
+    #[test_case([1, 2, 3, 4], [4], square, [1, 4, 9, 16], [4]; "square vector")]
+    #[test_case([-3, -2, -1, 0, 1, 2, 3], [7], square, [9, 4, 1, 0, 1, 4, 9], [7]; "square mixed signs")]
+    #[test_case([2, 3, 4, 5], [2, 2], square, [4, 9, 16, 25], [2, 2]; "square matrix")]
+    fn test_map_i32<const N: usize, const S: usize, const ED: usize, const ES: usize>(
         data: [i32; N],
         shape: [usize; S],
         f: fn(i32) -> i32,
-        expected_data: Vec<i32>,
-        expected_shape: Vec<usize>,
+        expected_data: [i32; ED],
+        expected_shape: [usize; ES],
     ) {
         let tensor = Tensor::new(data, shape);
         let mapped = tensor.map(f);

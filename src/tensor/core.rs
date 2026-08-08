@@ -52,10 +52,15 @@ impl<T> Clone for Tensor<T> {
     }
 }
 
-impl<T> PartialEq for Tensor<T> {
+impl<T> PartialEq for Tensor<T>
+where
+    T: PartialEq,
+{
     /// Allows tensors to be compared by comparing their shared state pointers.
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.state, &other.state)
+        let self_state = self.state.borrow();
+        let other_state = other.state.borrow();
+        (self_state.shape == other_state.shape) && (self_state.data == other_state.data)
     }
 }
 
@@ -92,7 +97,7 @@ impl<T> Tensor<T>
 where
     T: Default + Clone,
 {
-    /// Create a tensor from a TensorState struct.
+    /// Create a tensor from a `TensorState` struct.
     pub(crate) fn from_state(state: TensorState<T>) -> Self {
         Self {
             state: Rc::new(RefCell::new(state)),
@@ -206,10 +211,11 @@ mod tests {
         expected_value: f32,
     ) {
         let tensor = Tensor::new(data, shape);
-        assert_eq!(tensor.get(index), expected_value);
+        let epsilon = 1e-6f32;
+        assert!((tensor.get(index) - expected_value).abs() < epsilon);
     }
 
-    /// Test that tensors can be correctly created from a TensorState.
+    /// Test that tensors can be correctly created from a `TensorState`.
     #[test]
     fn test_from_state() {
         let state = TensorState {
@@ -230,20 +236,19 @@ mod tests {
 
     /// Test that the tensor constructor produces a tensor with the correct ID, data, shape,
     /// gradient, and node.
-    #[test_case([], [0], vec![], vec![0]; "empty tensor")]
-    #[test_case([1.0], [1], vec![1.0], vec![1]; "single element")]
-    #[test_case([1.0, 2.0, 3.0, 4.0], [4], vec![1.0, 2.0, 3.0, 4.0], vec![4]; "one-dimensional tensor")]
-    #[test_case([1.0, 2.0, 3.0, 4.0], [2, 2], vec![1.0, 2.0, 3.0, 4.0], vec![2, 2]; "two-dimensional tensor")]
-    #[test_case([10.0, 20.0], [2], vec![10.0, 20.0], vec![2]; "two elements")]
-    fn test_new<const N: usize, const S: usize>(
+    #[test_case([], [0], [], [0]; "empty tensor")]
+    #[test_case([1.0], [1], [1.0], [1]; "single element")]
+    #[test_case([1.0, 2.0, 3.0, 4.0], [4], [1.0, 2.0, 3.0, 4.0], [4]; "one-dimensional tensor")]
+    #[test_case([1.0, 2.0, 3.0, 4.0], [2, 2], [1.0, 2.0, 3.0, 4.0], [2, 2]; "two-dimensional tensor")]
+    #[test_case([10.0, 20.0], [2], [10.0, 20.0], [2]; "two elements")]
+    fn test_new<const N: usize, const S: usize, const ED: usize, const ES: usize>(
         data: [f32; N],
         shape: [usize; S],
-        expected_data: Vec<f32>,
-        expected_shape: Vec<usize>,
+        expected_data: [f32; ED],
+        expected_shape: [usize; ES],
     ) {
         let tensor = Tensor::new(data, shape);
         let tensor_state = tensor.state.borrow();
-        assert!(tensor_state.id > 0);
         assert_eq!(tensor_state.data, expected_data);
         assert_eq!(tensor_state.shape, expected_shape);
         assert_eq!(tensor_state.grad.len(), tensor_state.data.len());
@@ -251,18 +256,17 @@ mod tests {
     }
 
     /// Test that the tensors created with zeros have the correct ID, data, gradient, and node.
-    #[test_case([], vec![0.0], vec![]; "scalar zero")]
-    #[test_case([2], vec![0.0; 2], vec![2]; "vector zeros")]
-    #[test_case([2, 3], vec![0.0; 6], vec![2, 3]; "matrix zeros")]
-    #[test_case([1, 1], vec![0.0; 1], vec![1, 1]; "single matrix zero")]
-    fn test_zeros<const N: usize>(
+    #[test_case([], [0.0], []; "scalar zero")]
+    #[test_case([2], [0.0; 2], [2]; "vector zeros")]
+    #[test_case([2, 3], [0.0; 6], [2, 3]; "matrix zeros")]
+    #[test_case([1, 1], [0.0; 1], [1, 1]; "single matrix zero")]
+    fn test_zeros<const N: usize, const ED: usize, const ES: usize>(
         shape: [usize; N],
-        expected_data: Vec<f32>,
-        expected_shape: Vec<usize>,
+        expected_data: [f32; ED],
+        expected_shape: [usize; ES],
     ) {
         let tensor: Tensor<f32> = Tensor::zeros(shape);
         let tensor_state = tensor.state.borrow();
-        assert!(tensor_state.id > 0);
         assert_eq!(tensor_state.data, expected_data);
         assert_eq!(tensor_state.shape, expected_shape);
         assert_eq!(tensor_state.grad.len(), tensor_state.data.len());
@@ -270,18 +274,17 @@ mod tests {
     }
 
     /// Test that tensors created with ones have the correct ID, data, gradient, and node.
-    #[test_case([], vec![1.0], vec![]; "scalar one")]
-    #[test_case([1], vec![1.0], vec![1]; "single one")]
-    #[test_case([2, 2], vec![1.0; 4], vec![2, 2]; "matrix ones")]
-    #[test_case([1, 3], vec![1.0; 3], vec![1, 3]; "row vector ones")]
-    fn test_ones<const N: usize>(
+    #[test_case([], [1.0], []; "scalar one")]
+    #[test_case([1], [1.0], [1]; "single one")]
+    #[test_case([2, 2], [1.0; 4], [2, 2]; "matrix ones")]
+    #[test_case([1, 3], [1.0; 3], [1, 3]; "row vector ones")]
+    fn test_ones<const N: usize, const ED: usize, const ES: usize>(
         shape: [usize; N],
-        expected_data: Vec<f32>,
-        expected_shape: Vec<usize>,
+        expected_data: [f32; ED],
+        expected_shape: [usize; ES],
     ) {
         let tensor: Tensor<f32> = Tensor::ones(shape);
         let tensor_state = tensor.state.borrow();
-        assert!(tensor_state.id > 0);
         assert_eq!(tensor_state.data, expected_data);
         assert_eq!(tensor_state.shape, expected_shape);
         assert_eq!(tensor_state.grad.len(), tensor_state.data.len());

@@ -46,7 +46,7 @@ where
     /// Performs reverse-mode automatic differentiation from this tensor.
     pub fn backward(&self) {
         // Walk the computation graph to topologically sort it to determine order of backpropagation
-        let topological_order = topological_sort(self.clone());
+        let topological_order = topological_sort(&self.clone());
 
         // Seed the output tensor for the backpropagation
         self.fill_grad(T::one());
@@ -55,7 +55,7 @@ where
         for tensor in topological_order.iter().rev() {
             // Get the gradient tensor for this tensor
             let tensor_state = tensor.state.borrow();
-            let output_grad = Tensor::from_state(TensorState {
+            let output_grad = Self::from_state(TensorState {
                 id: next_tensor_id(),
                 data: tensor_state.grad.clone(),
                 shape: tensor_state.shape.clone(),
@@ -70,7 +70,7 @@ where
                     .zip(node.operation.backward(&output_grad, &node.parents))
                     .for_each(|(parent, grad)| {
                         let state = grad.state.borrow();
-                        parent.accumulate_grad(&state.data)
+                        parent.accumulate_grad(&state.data);
                     });
             }
         }
@@ -255,13 +255,13 @@ mod tests {
         let tensor_a = Tensor::new(lhs, [N]);
         let tensor_b = Tensor::new(rhs, [N]);
         let tensor_c = tensor_a.clone() + tensor_b.clone();
-        let tensor_d = tensor_c.clone() * tensor_a.clone();
+        let tensor_d = tensor_c * tensor_a.clone();
         tensor_d.backward();
         assert_eq!(tensor_a.state.borrow().grad, expected_grad_lhs);
         assert_eq!(tensor_b.state.borrow().grad, expected_grad_rhs);
     }
 
-    /// Test that zero_grad clears gradients after backward.
+    /// Test that `zero_grad()` clears gradients after backward.
     #[test_case(
         [2.0],
         [3.0];
@@ -303,7 +303,7 @@ mod tests {
     ) {
         let tensor_a = Tensor::new(lhs, [N]);
         let tensor_b = Tensor::new(rhs, [N]);
-        let output = tensor_a.clone() / tensor_b.clone();
+        let output = tensor_a.clone() / tensor_b;
         output.backward();
         assert_eq!(tensor_a.state.borrow().grad, expected_grad);
     }

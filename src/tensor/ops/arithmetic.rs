@@ -95,7 +95,7 @@ where
 
 /// Apply the resultant elementwise operation between a tensor and another tensor updating the
 /// left-hand side tensor.
-fn apply_elementwise_assign<T, F>(lhs: &mut Tensor<T>, rhs: &Tensor<T>, f: F)
+fn apply_elementwise_assign<T, F>(lhs: &Tensor<T>, rhs: &Tensor<T>, f: F)
 where
     T: Copy,
     F: Fn(T, T) -> T,
@@ -114,7 +114,7 @@ where
 
 /// Apply the resultant elementwise operation between a tensor and a scalar updating the left-hand
 /// side tensor.
-fn apply_scalar_assign<T, F>(lhs: &mut Tensor<T>, rhs: T, f: F)
+fn apply_scalar_assign<T, F>(lhs: &Tensor<T>, rhs: T, f: F)
 where
     T: Copy,
     F: Fn(T, T) -> T,
@@ -129,7 +129,7 @@ impl<T> Add for Tensor<T>
 where
     T: Copy + Add<Output = T> + Default + AddAssign,
 {
-    type Output = Tensor<T>;
+    type Output = Self;
 
     /// Add two referenced tensors.
     fn add(self, rhs: Self) -> Self::Output {
@@ -141,7 +141,7 @@ impl<T> Add<T> for Tensor<T>
 where
     T: Copy + Add<Output = T> + Default + AddAssign,
 {
-    type Output = Tensor<T>;
+    type Output = Self;
 
     /// Add a referenced tensor and a scalar.
     fn add(self, scalar: T) -> Self::Output {
@@ -149,12 +149,12 @@ where
     }
 }
 
-impl<T> AddAssign<Tensor<T>> for Tensor<T>
+impl<T> AddAssign<Self> for Tensor<T>
 where
     T: Copy + Add<Output = T>,
 {
     /// Add a tensor to all tensor elements.
-    fn add_assign(&mut self, rhs: Tensor<T>) {
+    fn add_assign(&mut self, rhs: Self) {
         apply_elementwise_assign(self, &rhs, |a, b| a + b);
     }
 }
@@ -173,7 +173,7 @@ impl<T> Sub for Tensor<T>
 where
     T: Copy + Sub<Output = T> + Default + AddAssign + Neg<Output = T>,
 {
-    type Output = Tensor<T>;
+    type Output = Self;
 
     /// Subtract two referenced tensors.
     fn sub(self, rhs: Self) -> Self::Output {
@@ -185,7 +185,7 @@ impl<T> Sub<T> for Tensor<T>
 where
     T: Copy + Sub<Output = T> + Default + AddAssign + Neg<Output = T>,
 {
-    type Output = Tensor<T>;
+    type Output = Self;
 
     /// Subtract a scalar from a referenced tensor.
     fn sub(self, scalar: T) -> Self::Output {
@@ -193,12 +193,12 @@ where
     }
 }
 
-impl<T> SubAssign<Tensor<T>> for Tensor<T>
+impl<T> SubAssign<Self> for Tensor<T>
 where
     T: Copy + Sub<Output = T>,
 {
     /// Subtract a tensor from all tensor elements.
-    fn sub_assign(&mut self, rhs: Tensor<T>) {
+    fn sub_assign(&mut self, rhs: Self) {
         apply_elementwise_assign(self, &rhs, |a, b| a - b);
     }
 }
@@ -217,7 +217,7 @@ impl<T> Mul for Tensor<T>
 where
     T: Copy + Mul<Output = T> + Default + AddAssign,
 {
-    type Output = Tensor<T>;
+    type Output = Self;
 
     /// Multiply two tensors.
     fn mul(self, rhs: Self) -> Self::Output {
@@ -229,7 +229,7 @@ impl<T> Mul<T> for Tensor<T>
 where
     T: Copy + Mul<Output = T> + Default + AddAssign,
 {
-    type Output = Tensor<T>;
+    type Output = Self;
 
     /// Multiply a tensor by a scalar.
     fn mul(self, scalar: T) -> Self::Output {
@@ -237,12 +237,12 @@ where
     }
 }
 
-impl<T> MulAssign<Tensor<T>> for Tensor<T>
+impl<T> MulAssign<Self> for Tensor<T>
 where
     T: Copy + Mul<Output = T>,
 {
     /// Multiply all tensor elements by a tensor.
-    fn mul_assign(&mut self, rhs: Tensor<T>) {
+    fn mul_assign(&mut self, rhs: Self) {
         apply_elementwise_assign(self, &rhs, |a, b| a * b);
     }
 }
@@ -261,7 +261,7 @@ impl<T> Div for Tensor<T>
 where
     T: Copy + Div<Output = T> + Default + AddAssign + Mul<Output = T> + Neg<Output = T>,
 {
-    type Output = Tensor<T>;
+    type Output = Self;
 
     /// Divide two tensors.
     fn div(self, rhs: Self) -> Self::Output {
@@ -273,7 +273,7 @@ impl<T> Div<T> for Tensor<T>
 where
     T: Copy + Div<Output = T> + Default + AddAssign + Mul<Output = T> + Neg<Output = T>,
 {
-    type Output = Tensor<T>;
+    type Output = Self;
 
     /// Divide a tensor by a scalar.
     fn div(self, scalar: T) -> Self::Output {
@@ -281,12 +281,12 @@ where
     }
 }
 
-impl<T> DivAssign<Tensor<T>> for Tensor<T>
+impl<T> DivAssign<Self> for Tensor<T>
 where
     T: Copy + Div<Output = T>,
 {
     /// Divide all tensor elements by a tensor.
-    fn div_assign(&mut self, rhs: Tensor<T>) {
+    fn div_assign(&mut self, rhs: Self) {
         apply_elementwise_assign(self, &rhs, |a, b| a / b);
     }
 }
@@ -305,7 +305,7 @@ impl<T> Neg for Tensor<T>
 where
     T: Neg<Output = T> + Copy + Default + AddAssign,
 {
-    type Output = Tensor<T>;
+    type Output = Self;
 
     /// Negate all tensor elements.
     fn neg(self) -> Self::Output {
@@ -324,7 +324,7 @@ mod tests {
         [3],
         [4, 5, 6],
         [3],
-        vec![5, 7, 9];
+        [5, 7, 9];
         "positive integers"
     )]
     #[test_case(
@@ -332,7 +332,7 @@ mod tests {
         [3],
         [1, 2, 3],
         [3],
-        vec![1, 2, 3];
+        [1, 2, 3];
         "add zero tensor"
     )]
     #[test_case(
@@ -340,7 +340,7 @@ mod tests {
         [3],
         [1, 2, 3],
         [3],
-        vec![0, 0, 0];
+        [0, 0, 0];
         "opposite values"
     )]
     #[test_case(
@@ -348,7 +348,7 @@ mod tests {
         [1],
         [5, 10, 15],
         [3],
-        vec![6, 11, 16];
+        [6, 11, 16];
         "add scalar to tensor"
     )]
     #[test_case(
@@ -356,7 +356,7 @@ mod tests {
         [1],
         [5, 5, 5],
         [3],
-        vec![15, 15, 15];
+        [15, 15, 15];
         "add same scalar to all tensor elements"
     )]
     #[test_case(
@@ -364,15 +364,21 @@ mod tests {
         [1],
         [0, -1, -2],
         [3],
-        vec![1, 0, -1];
+        [1, 0, -1];
         "add scalar to negative values"
     )]
-    fn test_add<const A: usize, const B: usize, const AS: usize, const BS: usize>(
+    fn test_add<
+        const A: usize,
+        const B: usize,
+        const AS: usize,
+        const BS: usize,
+        const E: usize,
+    >(
         a: [i32; A],
         a_shape: [usize; AS],
         b: [i32; B],
         b_shape: [usize; BS],
-        expected: Vec<i32>,
+        expected: [i32; E],
     ) {
         let tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
@@ -387,7 +393,7 @@ mod tests {
         [3],
         [4, 5, 6],
         [3],
-        vec![5, 7, 9];
+        [5, 7, 9];
         "positive integers"
     )]
     #[test_case(
@@ -395,7 +401,7 @@ mod tests {
         [3],
         [1, 2, 3],
         [3],
-        vec![1, 2, 3];
+        [1, 2, 3];
         "add zero tensor"
     )]
     #[test_case(
@@ -403,15 +409,21 @@ mod tests {
         [3],
         [1, 2, 3],
         [3],
-        vec![0, 0, 0];
+        [0, 0, 0];
         "opposite values"
     )]
-    fn test_add_assign<const A: usize, const B: usize, const AS: usize, const BS: usize>(
+    fn test_add_assign<
+        const A: usize,
+        const B: usize,
+        const AS: usize,
+        const BS: usize,
+        const E: usize,
+    >(
         a: [i32; A],
         a_shape: [usize; AS],
         b: [i32; B],
         b_shape: [usize; BS],
-        expected: Vec<i32>,
+        expected: [i32; E],
     ) {
         let mut tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
@@ -427,7 +439,7 @@ mod tests {
         [3];
         "add scalar to tensor"
     )]
-    #[should_panic]
+    #[should_panic(expected = "Cannot broadcast tensor of size 3 to size 1")]
     fn test_add_assign_invalid<const A: usize, const B: usize, const AS: usize, const BS: usize>(
         a: [i32; A],
         a_shape: [usize; AS],
@@ -445,7 +457,7 @@ mod tests {
         [3],
         [1, 2, 3],
         [3],
-        vec![4, 4, 4];
+        [4, 4, 4];
         "positive result"
     )]
     #[test_case(
@@ -453,7 +465,7 @@ mod tests {
         [3],
         [1, 1, 1],
         [3],
-        vec![0, 0, 0];
+        [0, 0, 0];
         "subtract equal tensors"
     )]
     #[test_case(
@@ -461,7 +473,7 @@ mod tests {
         [3],
         [1, 2, 3],
         [3],
-        vec![-1, -2, -3];
+        [-1, -2, -3];
         "negative result"
     )]
     #[test_case(
@@ -469,7 +481,7 @@ mod tests {
         [1],
         [5, 10, 15],
         [3],
-        vec![5, 0, -5];
+        [5, 0, -5];
         "scalar subtraction from tensor"
     )]
     #[test_case(
@@ -477,15 +489,21 @@ mod tests {
         [3],
         [5],
         [1],
-        vec![0, 5, 10];
+        [0, 5, 10];
         "tensor subtraction from scalar"
     )]
-    fn test_sub<const A: usize, const B: usize, const AS: usize, const BS: usize>(
+    fn test_sub<
+        const A: usize,
+        const B: usize,
+        const AS: usize,
+        const BS: usize,
+        const E: usize,
+    >(
         a: [i32; A],
         a_shape: [usize; AS],
         b: [i32; B],
         b_shape: [usize; BS],
-        expected: Vec<i32>,
+        expected: [i32; E],
     ) {
         let tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
@@ -500,7 +518,7 @@ mod tests {
         [3],
         [4, 5, 6],
         [3],
-        vec![1, 1, 1];
+        [1, 1, 1];
         "positive integers"
     )]
     #[test_case(
@@ -508,7 +526,7 @@ mod tests {
         [3],
         [1, 2, 3],
         [3],
-        vec![-1, -2, -3];
+        [-1, -2, -3];
         "subtract from zero tensor"
     )]
     #[test_case(
@@ -516,15 +534,21 @@ mod tests {
         [3],
         [1, 2, 3],
         [3],
-        vec![-2, -4, -6];
+        [-2, -4, -6];
         "negative values"
     )]
-    fn test_sub_assign<const A: usize, const B: usize, const AS: usize, const BS: usize>(
+    fn test_sub_assign<
+        const A: usize,
+        const B: usize,
+        const AS: usize,
+        const BS: usize,
+        const E: usize,
+    >(
         a: [i32; A],
         a_shape: [usize; AS],
         b: [i32; B],
         b_shape: [usize; BS],
-        expected: Vec<i32>,
+        expected: [i32; E],
     ) {
         let mut tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
@@ -540,7 +564,7 @@ mod tests {
         [3];
         "scalar subtraction from tensor"
     )]
-    #[should_panic]
+    #[should_panic(expected = "Cannot broadcast tensor of size 3 to size 1")]
     fn test_sub_assign_invalid<const A: usize, const B: usize, const AS: usize, const BS: usize>(
         a: [i32; A],
         a_shape: [usize; AS],
@@ -558,7 +582,7 @@ mod tests {
         [3],
         [4, 5, 6],
         [3],
-        vec![4, 10, 18];
+        [4, 10, 18];
         "positive integers"
     )]
     #[test_case(
@@ -566,7 +590,7 @@ mod tests {
         [3],
         [10, 10, 10],
         [3],
-        vec![0, 10, 20];
+        [0, 10, 20];
         "multiply by constant"
     )]
     #[test_case(
@@ -574,7 +598,7 @@ mod tests {
         [3],
         [1, -2, 3],
         [3],
-        vec![-1, 4, -9];
+        [-1, 4, -9];
         "mixed signs"
     )]
     #[test_case(
@@ -582,7 +606,7 @@ mod tests {
         [1],
         [1, 2, 3],
         [3],
-        vec![2, 4, 6];
+        [2, 4, 6];
         "multiply scalar by tensor"
     )]
     #[test_case(
@@ -590,15 +614,21 @@ mod tests {
         [3],
         [2],
         [1],
-        vec![2, 4, 6];
+        [2, 4, 6];
         "multiply tensor by scalar"
     )]
-    fn test_mul<const A: usize, const B: usize, const AS: usize, const BS: usize>(
+    fn test_mul<
+        const A: usize,
+        const B: usize,
+        const AS: usize,
+        const BS: usize,
+        const E: usize,
+    >(
         a: [i32; A],
         a_shape: [usize; AS],
         b: [i32; B],
         b_shape: [usize; BS],
-        expected: Vec<i32>,
+        expected: [i32; E],
     ) {
         let tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
@@ -613,7 +643,7 @@ mod tests {
         [3],
         [2, 2, 2],
         [3],
-        vec![4, 6, 8];
+        [4, 6, 8];
         "positive integers"
     )]
     #[test_case(
@@ -621,7 +651,7 @@ mod tests {
         [3],
         [2, 2, 2],
         [3],
-        vec![2, 4, 0];
+        [2, 4, 0];
         "multiplication with zero"
     )]
     #[test_case(
@@ -629,15 +659,21 @@ mod tests {
         [3],
         [1, 2, 3],
         [3],
-        vec![-1, -4, -9];
+        [-1, -4, -9];
         "negative values"
     )]
-    fn test_mul_assign<const A: usize, const B: usize, const AS: usize, const BS: usize>(
+    fn test_mul_assign<
+        const A: usize,
+        const B: usize,
+        const AS: usize,
+        const BS: usize,
+        const E: usize,
+    >(
         a: [i32; A],
         a_shape: [usize; AS],
         b: [i32; B],
         b_shape: [usize; BS],
-        expected: Vec<i32>,
+        expected: [i32; E],
     ) {
         let mut tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
@@ -653,7 +689,7 @@ mod tests {
         [3];
         "scalar multiplication"
     )]
-    #[should_panic]
+    #[should_panic(expected = "Cannot broadcast tensor of size 3 to size 1")]
     fn test_mul_assign_invalid<const A: usize, const B: usize, const AS: usize, const BS: usize>(
         a: [i32; A],
         a_shape: [usize; AS],
@@ -671,7 +707,7 @@ mod tests {
         [3],
         [2, 3, 5],
         [3],
-        vec![4, 3, 2];
+        [4, 3, 2];
         "even division"
     )]
     #[test_case(
@@ -679,7 +715,7 @@ mod tests {
         [3],
         [2, 5, 10],
         [3],
-        vec![5, 4, 3];
+        [5, 4, 3];
         "different divisors"
     )]
     #[test_case(
@@ -687,7 +723,7 @@ mod tests {
         [3],
         [1, 2, 3],
         [3],
-        vec![3, 3, 3];
+        [3, 3, 3];
         "integer truncation"
     )]
     #[test_case(
@@ -695,7 +731,7 @@ mod tests {
         [3],
         [3],
         [1],
-        vec![10, 20, 30];
+        [10, 20, 30];
         "tensor divided by scalar"
     )]
     #[test_case(
@@ -703,15 +739,21 @@ mod tests {
         [1],
         [10, 20, 25],
         [3],
-        vec![10, 5, 4];
+        [10, 5, 4];
         "scalar divided by each tensor element"
     )]
-    fn test_div<const A: usize, const B: usize, const AS: usize, const BS: usize>(
+    fn test_div<
+        const A: usize,
+        const B: usize,
+        const AS: usize,
+        const BS: usize,
+        const E: usize,
+    >(
         a: [i32; A],
         a_shape: [usize; AS],
         b: [i32; B],
         b_shape: [usize; BS],
-        expected: Vec<i32>,
+        expected: [i32; E],
     ) {
         let tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
@@ -726,7 +768,7 @@ mod tests {
         [3],
         [2, 2, 2],
         [3],
-        vec![5, 10, 15];
+        [5, 10, 15];
         "positive integers"
     )]
     #[test_case(
@@ -734,7 +776,7 @@ mod tests {
         [3],
         [2, 2, 2],
         [3],
-        vec![0, 0, 0];
+        [0, 0, 0];
         "division with zero numerator"
     )]
     #[test_case(
@@ -742,15 +784,21 @@ mod tests {
         [3],
         [2, 2, 2],
         [3],
-        vec![-5, -10, -15];
+        [-5, -10, -15];
         "negative values"
     )]
-    fn test_div_assign<const A: usize, const B: usize, const AS: usize, const BS: usize>(
+    fn test_div_assign<
+        const A: usize,
+        const B: usize,
+        const AS: usize,
+        const BS: usize,
+        const E: usize,
+    >(
         a: [i32; A],
         a_shape: [usize; AS],
         b: [i32; B],
         b_shape: [usize; BS],
-        expected: Vec<i32>,
+        expected: [i32; E],
     ) {
         let mut tensor_one = Tensor::new(a, a_shape);
         let tensor_two = Tensor::new(b, b_shape);
@@ -766,7 +814,7 @@ mod tests {
         [3];
         "scalar division"
     )]
-    #[should_panic]
+    #[should_panic(expected = "Cannot broadcast tensor of size 3 to size 1")]
     fn test_div_assign_invalid<const A: usize, const B: usize, const AS: usize, const BS: usize>(
         a: [i32; A],
         a_shape: [usize; AS],
