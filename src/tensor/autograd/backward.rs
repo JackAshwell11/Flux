@@ -31,16 +31,6 @@ where
 
 impl<T> Tensor<T>
 where
-    T: Clone + Default,
-{
-    /// Resets the gradient values to their default state.
-    pub fn zero_grad(&self) {
-        self.fill_grad(T::default());
-    }
-}
-
-impl<T> Tensor<T>
-where
     T: Clone + One + Default + Debug + Copy + AddAssign,
 {
     /// Performs reverse-mode automatic differentiation from this tensor.
@@ -124,22 +114,6 @@ mod tests {
         tensor.state.borrow_mut().grad = initial.to_vec();
         tensor.fill_grad(value);
         assert_eq!(tensor.state.borrow().grad, expected);
-    }
-
-    /// Test that gradients are reset to their default value.
-    #[test_case(
-        [1.0, 2.0, 3.0];
-        "vector gradient reset"
-    )]
-    #[test_case(
-        [5.0];
-        "scalar gradient reset"
-    )]
-    fn test_zero_grad<const N: usize>(value: [f32; N]) {
-        let tensor = Tensor::new(value, [N]);
-        tensor.accumulate_grad(&value);
-        tensor.zero_grad();
-        assert_eq!(tensor.state.borrow().grad, vec![0.0; N]);
     }
 
     /// Test reverse-mode differentiation through a simple graph.
@@ -277,8 +251,8 @@ mod tests {
         let tensor_b = Tensor::new(rhs, [N]);
         let output = tensor_a.clone() * tensor_b.clone();
         output.backward();
-        tensor_a.zero_grad();
-        tensor_b.zero_grad();
+        tensor_a.fill_grad(0.0);
+        tensor_b.fill_grad(0.0);
         assert_eq!(tensor_a.state.borrow().grad, vec![0.0; N]);
         assert_eq!(tensor_b.state.borrow().grad, vec![0.0; N]);
     }

@@ -1,4 +1,6 @@
 use flux::loss::l2_loss;
+use flux::optim::core::Optimiser;
+use flux::optim::sgd::SGD;
 use flux::tensor::core::Tensor;
 
 /// Controls the number of iterations to run the training loop for.
@@ -19,15 +21,6 @@ const EXPECTED_INTERCEPT: f32 = 1.0;
 /// Controls the tolerance for the test.
 const EPSILON: f32 = 1e-4;
 
-/// Performs an in-place stochastic gradient descent (SGD) update:
-///     data -= lr * grad
-pub fn gradient_descent_step(param: &mut Tensor<f32>) {
-    let mut state = param.state.borrow_mut();
-    for i in 0..state.data.len() {
-        state.data[i] = LEARNING_RATE.mul_add(-state.grad[i], state.data[i]);
-    }
-}
-
 /// Test that the linear regression algorithm works correctly.
 #[test]
 fn test_linear_regression() {
@@ -36,8 +29,11 @@ fn test_linear_regression() {
     let y_tensor = Tensor::new([3.0, 5.0, 7.0, 9.0], [4]);
 
     // Initialise the output tensors which will be optimised
-    let mut gradient: Tensor<f32> = Tensor::zeros([1]);
-    let mut y_intercept: Tensor<f32> = Tensor::zeros([1]);
+    let gradient: Tensor<f32> = Tensor::zeros([1]);
+    let y_intercept: Tensor<f32> = Tensor::zeros([1]);
+
+    // Create the optimiser for the gradient descent algorithm
+    let optimiser = SGD::new(vec![gradient.clone(), y_intercept.clone()], LEARNING_RATE);
 
     // Track the previous loss value
     let mut previous_loss = f32::MAX;
@@ -55,13 +51,9 @@ fn test_linear_regression() {
         // Compute the backward pass to calculate the gradients
         loss.backward();
 
-        // Update the weights using the gradient descent algorithm
-        gradient_descent_step(&mut gradient);
-        gradient_descent_step(&mut y_intercept);
-
-        // Zero the gradients to prepare for the next iteration
-        gradient.zero_grad();
-        y_intercept.zero_grad();
+        // Perform a gradient descent step and reset the gradients for the next step
+        optimiser.step();
+        optimiser.zero_grad();
     }
 
     // Check that the output is correct
