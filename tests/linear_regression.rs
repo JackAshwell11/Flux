@@ -25,12 +25,12 @@ const EPSILON: f32 = 1e-4;
 #[test]
 fn test_linear_regression() {
     // Initialise the input tensors
-    let x_tensor = Tensor::new([1.0, 2.0, 3.0, 4.0], [4]);
-    let y_tensor = Tensor::new([3.0, 5.0, 7.0, 9.0], [4]);
+    let x_tensor = Tensor::new([1.0, 2.0, 3.0, 4.0], [4], false);
+    let y_tensor = Tensor::new([3.0, 5.0, 7.0, 9.0], [4], false);
 
     // Initialise the output tensors which will be optimised
-    let gradient: Tensor<f32> = Tensor::zeros([1]);
-    let y_intercept: Tensor<f32> = Tensor::zeros([1]);
+    let gradient: Tensor<f32> = Tensor::zeros([1], true);
+    let y_intercept: Tensor<f32> = Tensor::zeros([1], true);
 
     // Create the optimiser for the gradient descent algorithm
     let optimiser = SGD::new(vec![gradient.clone(), y_intercept.clone()], LEARNING_RATE);

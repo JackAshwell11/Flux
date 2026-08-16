@@ -23,6 +23,7 @@ where
             data,
             shape,
             grad: vec![T::default(); num_elements],
+            requires_grad: self.requires_grad(),
             node: None,
         })
     }
@@ -76,7 +77,7 @@ mod tests {
         expected_data: [i32; ED],
         expected_shape: [usize; ES],
     ) {
-        let tensor = Tensor::new(data, shape);
+        let tensor = Tensor::new(data, shape, true);
         let mapped = tensor.map(f);
         assert_eq!(mapped.state.borrow().data, expected_data);
         assert_eq!(mapped.state.borrow().shape, expected_shape);
@@ -85,7 +86,7 @@ mod tests {
     /// Test that mapping a tensor with a passthrough function preserves the same data.
     #[test]
     fn test_map() {
-        let tensor = Tensor::new([-2, -1, 0, 1, 2], [5]);
+        let tensor = Tensor::new([-2, -1, 0, 1, 2], [5], true);
         let mapped = tensor.map(|x| x);
         assert_eq!(mapped.state.borrow().data, tensor.state.borrow().data);
         assert_eq!(mapped.state.borrow().shape, tensor.state.borrow().shape);
@@ -94,7 +95,7 @@ mod tests {
     /// Test that mapping an empty tensor returns an empty tensor with the same shape.
     #[test]
     fn test_map_preserves_empty_tensor() {
-        let tensor: Tensor<i32> = Tensor::new([], [0]);
+        let tensor: Tensor<i32> = Tensor::new([], [0], true);
         let mapped = tensor.map(|x| x + 10);
         assert_eq!(mapped.state.borrow().data, Vec::new());
         assert_eq!(mapped.state.borrow().shape, vec![0]);
@@ -103,7 +104,7 @@ mod tests {
     /// Test that mapping a scalar tensor preserves scalar shape.
     #[test]
     fn test_map_preserves_scalar_shape() {
-        let tensor = Tensor::new([7], []);
+        let tensor = Tensor::new([7], [], true);
         let mapped = tensor.map(|x| x * 3);
         assert_eq!(mapped.state.borrow().data, vec![21]);
         assert_eq!(mapped.state.borrow().shape, Vec::new());
@@ -112,7 +113,7 @@ mod tests {
     /// Test that mapping does not mutate the original tensor.
     #[test]
     fn test_map_does_not_modify_original_tensor() {
-        let tensor = Tensor::new([1, 2, 3, 4], [2, 2]);
+        let tensor = Tensor::new([1, 2, 3, 4], [2, 2], true);
         let mapped = tensor.map(|x| x * 10);
         assert_eq!(tensor.state.borrow().data, vec![1, 2, 3, 4]);
         assert_eq!(tensor.state.borrow().shape, vec![2, 2]);
@@ -124,7 +125,7 @@ mod tests {
     #[test]
     fn test_map_can_capture_environment() {
         let offset = 5;
-        let tensor = Tensor::new([1, 2, 3], [3]);
+        let tensor = Tensor::new([1, 2, 3], [3], true);
         let mapped = tensor.map(|x| x + offset);
         assert_eq!(mapped.state.borrow().data, vec![6, 7, 8]);
         assert_eq!(mapped.state.borrow().shape, vec![3]);
@@ -133,7 +134,7 @@ mod tests {
     /// Test that mapping works for floating-point tensors.
     #[test]
     fn test_map_with_floating_point_values() {
-        let tensor = Tensor::new([1.0, 2.5, -3.0], [3]);
+        let tensor = Tensor::new([1.0, 2.5, -3.0], [3], true);
         let mapped = tensor.map(|x| x / 2.0);
         assert_eq!(mapped.state.borrow().data, vec![0.5, 1.25, -1.5]);
         assert_eq!(mapped.state.borrow().shape, vec![3]);
@@ -142,7 +143,7 @@ mod tests {
     /// Test that mapping works for boolean tensors.
     #[test]
     fn test_map_with_bool_values() {
-        let tensor = Tensor::new([true, false, true, false], [2, 2]);
+        let tensor = Tensor::new([true, false, true, false], [2, 2], true);
         let mapped = tensor.map(|x| !x);
         assert_eq!(mapped.state.borrow().data, vec![false, true, false, true]);
         assert_eq!(mapped.state.borrow().shape, vec![2, 2]);
@@ -151,7 +152,7 @@ mod tests {
     /// Test that mapping works for character tensors.
     #[test]
     fn test_map_with_char_values() {
-        let tensor = Tensor::new(['a', 'b', 'c'], [3]);
+        let tensor = Tensor::new(['a', 'b', 'c'], [3], true);
         let mapped = tensor.map(remap_char);
         assert_eq!(mapped.state.borrow().data, vec!['x', 'y', 'z']);
         assert_eq!(mapped.state.borrow().shape, vec![3]);
@@ -160,7 +161,7 @@ mod tests {
     /// Test that mapping preserves higher-rank tensor shapes.
     #[test]
     fn test_map_preserves_higher_rank_shape() {
-        let tensor = Tensor::new([1, 2, 3, 4, 5, 6, 7, 8], [2, 2, 2]);
+        let tensor = Tensor::new([1, 2, 3, 4, 5, 6, 7, 8], [2, 2, 2], true);
         let mapped = tensor.map(|x| x - 1);
         assert_eq!(mapped.state.borrow().data, vec![0, 1, 2, 3, 4, 5, 6, 7]);
         assert_eq!(mapped.state.borrow().shape, vec![2, 2, 2]);

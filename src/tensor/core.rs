@@ -22,6 +22,7 @@ pub struct TensorState<T> {
 
     // The gradient of this tensor
     pub grad: Vec<T>,
+    pub(crate) requires_grad: bool,
 
     // The autograd link for this tensor
     pub(crate) node: Option<OperationNode<T>>,
@@ -91,6 +92,12 @@ impl<T> Tensor<T> {
     {
         self.state.borrow().data[index]
     }
+
+    /// Get whether this tensor's gradient computation is required.
+    #[must_use]
+    pub fn requires_grad(&self) -> bool {
+        self.state.borrow().requires_grad
+    }
 }
 
 impl<T> Tensor<T>
@@ -109,7 +116,7 @@ where
     /// # Panics
     ///
     /// Panics if the number of elements in `data` does not match the product of `shape`.
-    pub fn new(data: impl Into<Vec<T>>, shape: impl Into<Vec<usize>>) -> Self {
+    pub fn new(data: impl Into<Vec<T>>, shape: impl Into<Vec<usize>>, requires_grad: bool) -> Self {
         let data = data.into();
         let shape = shape.into();
         let num_elements = shape.iter().product::<usize>();
@@ -119,12 +126,13 @@ where
             data,
             shape,
             grad: vec![T::default(); num_elements],
+            requires_grad,
             node: None,
         })
     }
 
     /// Create a tensor with a given shape and all zeros.
-    pub fn zeros(shape: impl Into<Vec<usize>>) -> Self {
+    pub fn zeros(shape: impl Into<Vec<usize>>, requires_grad: bool) -> Self {
         let shape = shape.into();
         let num_elements = shape.iter().product::<usize>();
         Self::from_state(TensorState {
@@ -132,6 +140,7 @@ where
             data: vec![T::default(); num_elements],
             shape,
             grad: vec![T::default(); num_elements],
+            requires_grad,
             node: None,
         })
     }
@@ -142,7 +151,7 @@ where
     T: From<f32> + Clone + Default,
 {
     /// Create a tensor with a given shape and all ones.
-    pub fn ones(shape: impl Into<Vec<usize>>) -> Self {
+    pub fn ones(shape: impl Into<Vec<usize>>, requires_grad: bool) -> Self {
         let shape = shape.into();
         let num_elements = shape.iter().product::<usize>();
         Self::from_state(TensorState {
@@ -150,6 +159,7 @@ where
             data: vec![T::from(1.0); num_elements],
             shape,
             grad: vec![T::default(); num_elements],
+            requires_grad,
             node: None,
         })
     }
@@ -163,7 +173,7 @@ mod tests {
     /// Test that cloning a tensor preserves its state pointer.
     #[test]
     fn test_clone() {
-        let tensor: Tensor<f32> = Tensor::zeros([2, 2]);
+        let tensor: Tensor<f32> = Tensor::zeros([2, 2], false);
         let cloned_tensor = tensor.clone();
         assert!(Rc::ptr_eq(&tensor.state, &cloned_tensor.state));
     }
@@ -184,7 +194,7 @@ mod tests {
     #[test_case([2, 3], 2; "two-dimensional rank")]
     #[test_case([2, 3, 4], 3; "three-dimensional rank")]
     fn test_rank<const N: usize>(shape: [usize; N], expected_rank: usize) {
-        let tensor: Tensor<f32> = Tensor::zeros(shape);
+        let tensor: Tensor<f32> = Tensor::zeros(shape, false);
         assert_eq!(tensor.rank(), expected_rank);
     }
 
@@ -195,7 +205,7 @@ mod tests {
     #[test_case([2, 3], 6; "matrix size")]
     #[test_case([2, 3, 4], 24; "three-dimensional size")]
     fn test_size<const N: usize>(shape: [usize; N], expected_size: usize) {
-        let tensor: Tensor<i32> = Tensor::zeros(shape);
+        let tensor: Tensor<i32> = Tensor::zeros(shape, false);
         assert_eq!(tensor.size(), expected_size);
     }
 
@@ -210,7 +220,7 @@ mod tests {
         index: usize,
         expected_value: f32,
     ) {
-        let tensor = Tensor::new(data, shape);
+        let tensor = Tensor::new(data, shape, false);
         let epsilon = 1e-6f32;
         assert!((tensor.get(index) - expected_value).abs() < epsilon);
     }
@@ -223,6 +233,7 @@ mod tests {
             data: vec![1.0, 2.0, 3.0],
             shape: vec![3],
             grad: vec![0.0, 0.0, 0.0],
+            requires_grad: false,
             node: None,
         };
         let tensor: Tensor<f32> = Tensor::from_state(state);
@@ -247,7 +258,7 @@ mod tests {
         expected_data: [f32; ED],
         expected_shape: [usize; ES],
     ) {
-        let tensor = Tensor::new(data, shape);
+        let tensor = Tensor::new(data, shape, false);
         let tensor_state = tensor.state.borrow();
         assert_eq!(tensor_state.data, expected_data);
         assert_eq!(tensor_state.shape, expected_shape);
@@ -265,7 +276,7 @@ mod tests {
         expected_data: [f32; ED],
         expected_shape: [usize; ES],
     ) {
-        let tensor: Tensor<f32> = Tensor::zeros(shape);
+        let tensor: Tensor<f32> = Tensor::zeros(shape, false);
         let tensor_state = tensor.state.borrow();
         assert_eq!(tensor_state.data, expected_data);
         assert_eq!(tensor_state.shape, expected_shape);
@@ -283,7 +294,7 @@ mod tests {
         expected_data: [f32; ED],
         expected_shape: [usize; ES],
     ) {
-        let tensor: Tensor<f32> = Tensor::ones(shape);
+        let tensor: Tensor<f32> = Tensor::ones(shape, false);
         let tensor_state = tensor.state.borrow();
         assert_eq!(tensor_state.data, expected_data);
         assert_eq!(tensor_state.shape, expected_shape);

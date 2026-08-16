@@ -26,6 +26,7 @@ where
                     data: vec![value],
                     shape: vec![],
                     grad: vec![T::default(); 1],
+                    requires_grad: self.requires_grad() || rhs.requires_grad(),
                     node: None,
                 })
             }
@@ -49,6 +50,7 @@ where
                     data,
                     shape,
                     grad: vec![T::default(); size],
+                    requires_grad: self.requires_grad() || rhs.requires_grad(),
                     node: None,
                 })
             }
@@ -72,6 +74,7 @@ where
                     data,
                     shape,
                     grad: vec![T::default(); size],
+                    requires_grad: self.requires_grad() || rhs.requires_grad(),
                     node: None,
                 })
             }
@@ -101,6 +104,7 @@ where
                     data,
                     shape,
                     grad: vec![T::default(); size],
+                    requires_grad: self.requires_grad() || rhs.requires_grad(),
                     node: None,
                 })
             }
@@ -127,6 +131,7 @@ where
                     data,
                     shape,
                     grad: vec![T::default(); size],
+                    requires_grad: self.requires_grad() || rhs.requires_grad(),
                     node: None,
                 })
             }
@@ -157,6 +162,7 @@ where
                     data,
                     shape,
                     grad: vec![T::default(); size],
+                    requires_grad: self.requires_grad() || rhs.requires_grad(),
                     node: None,
                 })
             }
@@ -298,8 +304,8 @@ mod tests {
         expected_data: [i32; ED],
         expected_shape: [usize; ES],
     ) {
-        let tensor_one = Tensor::new(a, a_shape);
-        let tensor_two = Tensor::new(b, b_shape);
+        let tensor_one = Tensor::new(a, a_shape, true);
+        let tensor_two = Tensor::new(b, b_shape, true);
         let result = tensor_one.matmul(&tensor_two);
         assert_eq!(result.state.borrow().data, expected_data);
         assert_eq!(result.state.borrow().shape, expected_shape);
@@ -352,8 +358,8 @@ mod tests {
         b: [i32; B],
         b_shape: [usize; BS],
     ) {
-        let tensor_one = Tensor::new(a, a_shape);
-        let tensor_two = Tensor::new(b, b_shape);
+        let tensor_one = Tensor::new(a, a_shape, true);
+        let tensor_two = Tensor::new(b, b_shape, true);
         let _ = tensor_one.matmul(&tensor_two);
     }
 }

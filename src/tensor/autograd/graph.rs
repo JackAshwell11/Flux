@@ -119,16 +119,16 @@ mod tests {
 
     /// Test that walking the graph is performed correctly.
     #[test_case(
-        vec![(Tensor::new([1.0], [1]), vec![])],
+        vec![(Tensor::new([1.0], [1], true), vec![])],
         [0],
         [0];
         "single tensor graph"
     )]
     #[test_case(
         vec![
-            (Tensor::new([1.0], [1]), vec![]),
-            (Tensor::new([2.0], [1]), vec![]),
-            (Tensor::new([3.0], [1]), vec![0, 1]),
+            (Tensor::new([1.0], [1], true), vec![]),
+            (Tensor::new([2.0], [1], true), vec![]),
+            (Tensor::new([3.0], [1], true), vec![0, 1]),
         ],
         [2, 0, 1],
         [0, 1, 2];
@@ -136,10 +136,10 @@ mod tests {
     )]
     #[test_case(
         vec![
-            (Tensor::new([1.0], [1]), vec![]),
-            (Tensor::new([2.0], [1]), vec![]),
-            (Tensor::new([3.0], [1]), vec![0, 1]),
-            (Tensor::new([4.0], [1]), vec![2, 1]),
+            (Tensor::new([1.0], [1], true), vec![]),
+            (Tensor::new([2.0], [1], true), vec![]),
+            (Tensor::new([3.0], [1], true), vec![0, 1]),
+            (Tensor::new([4.0], [1], true), vec![2, 1]),
         ],
         [3, 2, 0, 1],
         [0, 1, 2, 3];
@@ -179,8 +179,8 @@ mod tests {
     /// Test that printing a graph works correctly.
     #[test]
     fn test_print_graph() {
-        let tensor_a: Tensor<f32> = Tensor::new([1.0, 2.0], [2]);
-        let tensor_b: Tensor<f32> = Tensor::new([3.0, 4.0], [2]);
+        let tensor_a: Tensor<f32> = Tensor::new([1.0, 2.0], [2], true);
+        let tensor_b: Tensor<f32> = Tensor::new([3.0, 4.0], [2], true);
         let tensor_c = tensor_a * tensor_b;
         let expected_output = format!(
             "Node {} MulOperation├── Leaf [1.0, 2.0]├── Leaf [3.0, 4.0]",
@@ -191,47 +191,47 @@ mod tests {
 
     /// Test that a tensor graph can be sorted topologically correctly.
     #[test_case(
-        vec![(Tensor::new([1.0], [1]), vec![])],
+        vec![(Tensor::new([1.0], [1], true), vec![])],
         [0];
         "single tensor graph"
     )]
     #[test_case(
         vec![
-            (Tensor::new([1.0], [1]), vec![]),
-            (Tensor::new([2.0], [1]), vec![]),
-            (Tensor::new([3.0], [1]), vec![0, 1]),
+            (Tensor::new([1.0], [1], true), vec![]),
+            (Tensor::new([2.0], [1], true), vec![]),
+            (Tensor::new([3.0], [1], true), vec![0, 1]),
         ],
         [0, 1, 2];
         "three node DAG"
     )]
     #[test_case(
         vec![
-            (Tensor::new([1.0], [1]), vec![]),
-            (Tensor::new([2.0], [1]), vec![]),
-            (Tensor::new([3.0], [1]), vec![0, 1]),
-            (Tensor::new([4.0], [1]), vec![2, 1]),
+            (Tensor::new([1.0], [1], true), vec![]),
+            (Tensor::new([2.0], [1], true), vec![]),
+            (Tensor::new([3.0], [1], true), vec![0, 1]),
+            (Tensor::new([4.0], [1], true), vec![2, 1]),
         ],
         [0, 1, 2, 3];
         "four node complex DAG"
     )]
     #[test_case(
         vec![
-            (Tensor::new([1.0], [1]), vec![]),
-            (Tensor::new([2.0], [1]), vec![]),
-            (Tensor::new([3.0], [1]), vec![0, 1]),
-            (Tensor::new([4.0], [1]), vec![2]),
-            (Tensor::new([5.0], [1]), vec![2, 3]),
+            (Tensor::new([1.0], [1], true), vec![]),
+            (Tensor::new([2.0], [1], true), vec![]),
+            (Tensor::new([3.0], [1], true), vec![0, 1]),
+            (Tensor::new([4.0], [1], true), vec![2]),
+            (Tensor::new([5.0], [1], true), vec![2, 3]),
         ],
         [0, 1, 2, 3, 4];
         "complex multi-branch DAG"
     )]
     #[test_case(
         vec![
-            (Tensor::new([1.0], [1]), vec![]),
-            (Tensor::new([2.0], [1]), vec![0]),
-            (Tensor::new([3.0], [1]), vec![0]),
-            (Tensor::new([4.0], [1]), vec![1, 2]),
-            (Tensor::new([5.0], [1]), vec![3, 0]),
+            (Tensor::new([1.0], [1], true), vec![]),
+            (Tensor::new([2.0], [1], true), vec![0]),
+            (Tensor::new([3.0], [1], true), vec![0]),
+            (Tensor::new([4.0], [1], true), vec![1, 2]),
+            (Tensor::new([5.0], [1], true), vec![3, 0]),
         ],
         [0, 1, 2, 3, 4];
         "diamond dependency DAG with shared leaf"
