@@ -121,7 +121,7 @@ mod tests {
     #[test_case([2.0], [[2.0], [2.0]]; "scalar")]
     #[test_case([2.0, 3.0], [[2.0, 3.0], [2.0, 3.0]]; "vector")]
     fn test_add_backward<const N: usize>(grad_output: [f32; N], expected: [[f32; N]; 2]) {
-        let grad_output = Tensor::new(grad_output, [N]);
+        let grad_output = Tensor::new(grad_output, [N], true);
         let gradients = AddOperation.backward(&grad_output, &[]);
         assert_eq!(gradients[0].state.borrow().data, expected[0]);
         assert_eq!(gradients[1].state.borrow().data, expected[1]);
@@ -131,7 +131,7 @@ mod tests {
     #[test_case([2.0], [[2.0], [-2.0]]; "scalar")]
     #[test_case([2.0, 3.0], [[2.0, 3.0], [-2.0, -3.0]]; "vector")]
     fn test_sub_backward<const N: usize>(grad_output: [f32; N], expected: [[f32; N]; 2]) {
-        let grad_output = Tensor::new(grad_output, [N]);
+        let grad_output = Tensor::new(grad_output, [N], true);
         let gradients = SubOperation.backward(&grad_output, &[]);
         assert_eq!(gradients[0].state.borrow().data, expected[0]);
         assert_eq!(gradients[1].state.borrow().data, expected[1]);
@@ -158,9 +158,9 @@ mod tests {
         grad_output: [f32; N],
         expected: [[f32; N]; 2],
     ) {
-        let lhs = Tensor::new(lhs, [N]);
-        let rhs = Tensor::new(rhs, [N]);
-        let grad_output = Tensor::new(grad_output, [N]);
+        let lhs = Tensor::new(lhs, [N], true);
+        let rhs = Tensor::new(rhs, [N], true);
+        let grad_output = Tensor::new(grad_output, [N], true);
         let gradients = MulOperation.backward(&grad_output, &[lhs, rhs]);
         assert_eq!(gradients[0].state.borrow().data, expected[0]);
         assert_eq!(gradients[1].state.borrow().data, expected[1]);
@@ -187,9 +187,9 @@ mod tests {
         grad_output: [f32; N],
         expected: [[f32; N]; 2],
     ) {
-        let lhs = Tensor::new(lhs, [N]);
-        let rhs = Tensor::new(rhs, [N]);
-        let grad_output = Tensor::new(grad_output, [N]);
+        let lhs = Tensor::new(lhs, [N], true);
+        let rhs = Tensor::new(rhs, [N], true);
+        let grad_output = Tensor::new(grad_output, [N], true);
         let gradients = DivOperation.backward(&grad_output, &[lhs, rhs]);
         assert_eq!(gradients[0].state.borrow().data, expected[0]);
         assert_eq!(gradients[1].state.borrow().data, expected[1]);
@@ -209,7 +209,7 @@ mod tests {
         "four elements"
     )]
     fn test_mean_backward<const N: usize>(size: usize, grad_output: [f32; N], expected: [f32; N]) {
-        let grad_output = Tensor::new(grad_output, [N]);
+        let grad_output = Tensor::new(grad_output, [N], true);
         let gradients = MeanOperation { size }.backward(&grad_output, &[]);
         assert_eq!(gradients[0].state.borrow().data, expected);
     }
@@ -218,7 +218,7 @@ mod tests {
     #[test_case([2.0], [-2.0]; "scalar")]
     #[test_case([2.0, -3.0], [-2.0, 3.0]; "vector")]
     fn test_neg_backward<const N: usize>(grad_output: [f32; N], expected: [f32; N]) {
-        let grad_output = Tensor::new(grad_output, [N]);
+        let grad_output = Tensor::new(grad_output, [N], true);
         let gradients = NegateOperation.backward(&grad_output, &[]);
         assert_eq!(gradients[0].state.borrow().data, expected);
     }

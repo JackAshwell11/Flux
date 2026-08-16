@@ -29,15 +29,21 @@ where
             .map(|(&x, &y)| f(x, y))
             .collect()
     };
+    let requires_grad = lhs.requires_grad() || rhs.requires_grad();
     Tensor::from_state(TensorState {
         id: next_tensor_id(),
         data,
         shape: vec![size],
         grad: vec![T::default(); size],
-        node: Some(OperationNode {
-            parents: vec![lhs, rhs],
-            operation: Box::new(operation),
-        }),
+        requires_grad,
+        node: if requires_grad {
+            Some(OperationNode {
+                parents: vec![lhs, rhs],
+                operation: Box::new(operation),
+            })
+        } else {
+            None
+        },
     })
 }
 
@@ -55,15 +61,21 @@ where
             lhs_state.shape.clone(),
         )
     };
+    let requires_grad = lhs.requires_grad();
     Tensor::from_state(TensorState {
         id: next_tensor_id(),
         data,
         shape,
         grad: vec![T::default(); lhs.size()],
-        node: Some(OperationNode {
-            parents: vec![lhs],
-            operation: Box::new(operation),
-        }),
+        requires_grad,
+        node: if requires_grad {
+            Some(OperationNode {
+                parents: vec![lhs],
+                operation: Box::new(operation),
+            })
+        } else {
+            None
+        },
     })
 }
 
@@ -81,15 +93,21 @@ where
             state.shape.clone(),
         )
     };
+    let requires_grad = tensor.requires_grad();
     Tensor::from_state(TensorState {
         id: next_tensor_id(),
         data,
         shape,
         grad: vec![T::default(); tensor.size()],
-        node: Some(OperationNode {
-            parents: vec![tensor],
-            operation: Box::new(operation),
-        }),
+        requires_grad,
+        node: if requires_grad {
+            Some(OperationNode {
+                parents: vec![tensor],
+                operation: Box::new(operation),
+            })
+        } else {
+            None
+        },
     })
 }
 
@@ -380,8 +398,8 @@ mod tests {
         b_shape: [usize; BS],
         expected: [i32; E],
     ) {
-        let tensor_one = Tensor::new(a, a_shape);
-        let tensor_two = Tensor::new(b, b_shape);
+        let tensor_one = Tensor::new(a, a_shape, true);
+        let tensor_two = Tensor::new(b, b_shape, true);
         let result = tensor_one + tensor_two;
         assert_eq!(result.state.borrow().data, expected);
         assert_eq!(result.state.borrow().shape, vec![expected.len()]);
@@ -425,8 +443,8 @@ mod tests {
         b_shape: [usize; BS],
         expected: [i32; E],
     ) {
-        let mut tensor_one = Tensor::new(a, a_shape);
-        let tensor_two = Tensor::new(b, b_shape);
+        let mut tensor_one = Tensor::new(a, a_shape, true);
+        let tensor_two = Tensor::new(b, b_shape, true);
         tensor_one += tensor_two;
         assert_eq!(tensor_one.state.borrow().data, expected);
     }
@@ -446,8 +464,8 @@ mod tests {
         b: [i32; B],
         b_shape: [usize; BS],
     ) {
-        let mut tensor_one = Tensor::new(a, a_shape);
-        let tensor_two = Tensor::new(b, b_shape);
+        let mut tensor_one = Tensor::new(a, a_shape, true);
+        let tensor_two = Tensor::new(b, b_shape, true);
         tensor_one += tensor_two;
     }
 
@@ -505,8 +523,8 @@ mod tests {
         b_shape: [usize; BS],
         expected: [i32; E],
     ) {
-        let tensor_one = Tensor::new(a, a_shape);
-        let tensor_two = Tensor::new(b, b_shape);
+        let tensor_one = Tensor::new(a, a_shape, true);
+        let tensor_two = Tensor::new(b, b_shape, true);
         let result = tensor_one - tensor_two;
         assert_eq!(result.state.borrow().data, expected);
         assert_eq!(result.state.borrow().shape, vec![expected.len()]);
@@ -550,8 +568,8 @@ mod tests {
         b_shape: [usize; BS],
         expected: [i32; E],
     ) {
-        let mut tensor_one = Tensor::new(a, a_shape);
-        let tensor_two = Tensor::new(b, b_shape);
+        let mut tensor_one = Tensor::new(a, a_shape, true);
+        let tensor_two = Tensor::new(b, b_shape, true);
         tensor_one -= tensor_two;
         assert_eq!(tensor_one.state.borrow().data, expected);
     }
@@ -571,8 +589,8 @@ mod tests {
         b: [i32; B],
         b_shape: [usize; BS],
     ) {
-        let mut tensor_one = Tensor::new(a, a_shape);
-        let tensor_two = Tensor::new(b, b_shape);
+        let mut tensor_one = Tensor::new(a, a_shape, true);
+        let tensor_two = Tensor::new(b, b_shape, true);
         tensor_one -= tensor_two;
     }
 
@@ -630,8 +648,8 @@ mod tests {
         b_shape: [usize; BS],
         expected: [i32; E],
     ) {
-        let tensor_one = Tensor::new(a, a_shape);
-        let tensor_two = Tensor::new(b, b_shape);
+        let tensor_one = Tensor::new(a, a_shape, true);
+        let tensor_two = Tensor::new(b, b_shape, true);
         let result = tensor_one * tensor_two;
         assert_eq!(result.state.borrow().data, expected);
         assert_eq!(result.state.borrow().shape, vec![expected.len()]);
@@ -675,8 +693,8 @@ mod tests {
         b_shape: [usize; BS],
         expected: [i32; E],
     ) {
-        let mut tensor_one = Tensor::new(a, a_shape);
-        let tensor_two = Tensor::new(b, b_shape);
+        let mut tensor_one = Tensor::new(a, a_shape, true);
+        let tensor_two = Tensor::new(b, b_shape, true);
         tensor_one *= tensor_two;
         assert_eq!(tensor_one.state.borrow().data, expected);
     }
@@ -696,8 +714,8 @@ mod tests {
         b: [i32; B],
         b_shape: [usize; BS],
     ) {
-        let mut tensor_one = Tensor::new(a, a_shape);
-        let tensor_two = Tensor::new(b, b_shape);
+        let mut tensor_one = Tensor::new(a, a_shape, true);
+        let tensor_two = Tensor::new(b, b_shape, true);
         tensor_one *= tensor_two;
     }
 
@@ -755,8 +773,8 @@ mod tests {
         b_shape: [usize; BS],
         expected: [i32; E],
     ) {
-        let tensor_one = Tensor::new(a, a_shape);
-        let tensor_two = Tensor::new(b, b_shape);
+        let tensor_one = Tensor::new(a, a_shape, true);
+        let tensor_two = Tensor::new(b, b_shape, true);
         let result = tensor_one / tensor_two;
         assert_eq!(result.state.borrow().data, expected);
         assert_eq!(result.state.borrow().shape, vec![expected.len()]);
@@ -800,8 +818,8 @@ mod tests {
         b_shape: [usize; BS],
         expected: [i32; E],
     ) {
-        let mut tensor_one = Tensor::new(a, a_shape);
-        let tensor_two = Tensor::new(b, b_shape);
+        let mut tensor_one = Tensor::new(a, a_shape, true);
+        let tensor_two = Tensor::new(b, b_shape, true);
         tensor_one /= tensor_two;
         assert_eq!(tensor_one.state.borrow().data, expected);
     }
@@ -821,8 +839,8 @@ mod tests {
         b: [i32; B],
         b_shape: [usize; BS],
     ) {
-        let mut tensor_one = Tensor::new(a, a_shape);
-        let tensor_two = Tensor::new(b, b_shape);
+        let mut tensor_one = Tensor::new(a, a_shape, true);
+        let tensor_two = Tensor::new(b, b_shape, true);
         tensor_one /= tensor_two;
     }
 }

@@ -61,8 +61,8 @@ mod tests {
         target_shape: [usize; BS],
         expected: f64,
     ) {
-        let input_tensor = Tensor::new(input, input_shape);
-        let target_tensor = Tensor::new(target, target_shape);
+        let input_tensor = Tensor::new(input, input_shape, true);
+        let target_tensor = Tensor::new(target, target_shape, true);
         let result = l1_loss(input_tensor, target_tensor);
         assert!((result.state.borrow().data[0] - expected).abs() < 1e-6);
     }
@@ -99,8 +99,8 @@ mod tests {
         target_shape: [usize; BS],
         expected: f64,
     ) {
-        let input_tensor = Tensor::new(input, input_shape);
-        let target_tensor = Tensor::new(target, target_shape);
+        let input_tensor = Tensor::new(input, input_shape, true);
+        let target_tensor = Tensor::new(target, target_shape, true);
         let result = l2_loss(input_tensor, target_tensor);
         assert!((result.state.borrow().data[0] - expected).abs() < 1e-6);
     }

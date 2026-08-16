@@ -17,6 +17,7 @@ where
             data: vec![self.state.borrow().data.iter().copied().sum()],
             shape: vec![],
             grad: vec![T::default(); 1],
+            requires_grad: self.requires_grad(),
             node: None,
         })
     }
@@ -42,6 +43,7 @@ where
             data,
             shape,
             grad: vec![T::default(); num_elements],
+            requires_grad: self.requires_grad(),
             node: None,
         })
     }
@@ -65,15 +67,21 @@ where
             let len = T::from(size).expect("Failed to convert length to Float");
             (sum / len, size)
         };
+        let requires_grad = self.requires_grad();
         Self::from_state(TensorState {
             id: next_tensor_id(),
             data: vec![mean_val],
             shape: vec![],
             grad: vec![T::default(); 1],
-            node: Some(OperationNode {
-                parents: vec![self.clone()],
-                operation: Box::new(MeanOperation { size }),
-            }),
+            requires_grad,
+            node: if requires_grad {
+                Some(OperationNode {
+                    parents: vec![self.clone()],
+                    operation: Box::new(MeanOperation { size }),
+                })
+            } else {
+                None
+            },
         })
     }
 }
@@ -97,6 +105,7 @@ where
             data: vec![result],
             shape: vec![],
             grad: vec![T::default(); 1],
+            requires_grad: self.requires_grad(),
             node: None,
         })
     }
@@ -132,7 +141,7 @@ mod tests {
         expected_data: [i32; ED],
         expected_shape: [usize; ES],
     ) {
-        let tensor = Tensor::new(data, shape);
+        let tensor = Tensor::new(data, shape, true);
         let summed = tensor.sum();
         assert_eq!(summed.state.borrow().data, expected_data);
         assert_eq!(summed.state.borrow().shape, expected_shape);
@@ -149,7 +158,7 @@ mod tests {
         expected_data: [f32; ED],
         expected_shape: [usize; ES],
     ) {
-        let tensor = Tensor::new(data, shape);
+        let tensor = Tensor::new(data, shape, true);
         let mean_tensor = tensor.mean();
         assert_eq!(mean_tensor.state.borrow().data, expected_data);
         assert_eq!(mean_tensor.state.borrow().shape, expected_shape);
@@ -168,7 +177,7 @@ mod tests {
         expected_data: [i32; ED],
         expected_shape: [usize; ES],
     ) {
-        let tensor = Tensor::new(data, shape);
+        let tensor = Tensor::new(data, shape, true);
         let min_tensor = tensor.min();
         assert_eq!(min_tensor.state.borrow().data, expected_data);
         assert_eq!(min_tensor.state.borrow().shape, expected_shape);
@@ -187,7 +196,7 @@ mod tests {
         expected_data: [i32; ED],
         expected_shape: [usize; ES],
     ) {
-        let tensor = Tensor::new(data, shape);
+        let tensor = Tensor::new(data, shape, true);
         let max_tensor = tensor.max();
         assert_eq!(max_tensor.state.borrow().data, expected_data);
         assert_eq!(max_tensor.state.borrow().shape, expected_shape);
@@ -196,7 +205,7 @@ mod tests {
     /// Test that summing an empty tensor works correctly.
     #[test]
     fn test_empty_tensor_sum() {
-        let tensor = Tensor::<i32>::new([], [0]);
+        let tensor = Tensor::<i32>::new([], [0], true);
         assert_eq!(tensor.sum().state.borrow().data, vec![0]);
     }
 
@@ -204,7 +213,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Tensor is empty")]
     fn test_empty_tensor_max() {
-        let tensor = Tensor::<i32>::new([], [0]);
+        let tensor = Tensor::<i32>::new([], [0], true);
         let _ = tensor.max();
     }
 
@@ -212,7 +221,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Tensor is empty")]
     fn test_empty_tensor_min() {
-        let tensor = Tensor::<i32>::new([], [0]);
+        let tensor = Tensor::<i32>::new([], [0], true);
         let _ = tensor.min();
     }
 }

@@ -35,6 +35,11 @@ where
 {
     /// Performs reverse-mode automatic differentiation from this tensor.
     pub fn backward(&self) {
+        // Skip if the tensor does not require gradients
+        if !self.requires_grad() {
+            return;
+        }
+
         // Walk the computation graph to topologically sort it to determine order of backpropagation
         let topological_order = topological_sort(&self.clone());
 
@@ -50,6 +55,7 @@ where
                 data: tensor_state.grad.clone(),
                 shape: tensor_state.shape.clone(),
                 grad: tensor_state.grad.clone(),
+                requires_grad: false,
                 node: None,
             });
 
@@ -59,8 +65,10 @@ where
                     .iter()
                     .zip(node.operation.backward(&output_grad, &node.parents))
                     .for_each(|(parent, grad)| {
-                        let state = grad.state.borrow();
-                        parent.accumulate_grad(&state.data);
+                        if parent.requires_grad() {
+                            let state = grad.state.borrow();
+                            parent.accumulate_grad(&state.data);
+                        }
                     });
             }
         }
@@ -90,7 +98,7 @@ mod tests {
         initial: [f32; N],
         expected: [f32; N],
     ) {
-        let tensor = Tensor::new([0.0; N], [N]);
+        let tensor = Tensor::new([0.0; N], [N], true);
         tensor.state.borrow_mut().grad = initial.to_vec();
         tensor.accumulate_grad(&incoming);
         assert_eq!(tensor.state.borrow().grad, expected);
@@ -110,7 +118,7 @@ mod tests {
         "fill scalar gradient"
     )]
     fn test_fill_grad<const N: usize>(initial: [f32; N], value: f32, expected: [f32; N]) {
-        let tensor = Tensor::new([1.0; N], [N]);
+        let tensor = Tensor::new([1.0; N], [N], true);
         tensor.state.borrow_mut().grad = initial.to_vec();
         tensor.fill_grad(value);
         assert_eq!(tensor.state.borrow().grad, expected);
@@ -140,8 +148,8 @@ mod tests {
         expected_grad_lhs: [f32; N],
         expected_grad_rhs: [f32; N],
     ) {
-        let tensor_a = Tensor::new(lhs, [N]);
-        let tensor_b = Tensor::new(rhs, [N]);
+        let tensor_a = Tensor::new(lhs, [N], true);
+        let tensor_b = Tensor::new(rhs, [N], true);
         let tensor_c = tensor_a.clone() * tensor_b.clone();
         assert_eq!(tensor_c.state.borrow().data, expected_output);
         tensor_c.backward();
@@ -167,7 +175,7 @@ mod tests {
     )]
     fn test_backward_shared_dependency<const N: usize>(value: [f32; N], expected_grad: [f32; N]) {
         // d(x*x+x)/dx = 2x+1
-        let tensor = Tensor::new(value, [N]);
+        let tensor = Tensor::new(value, [N], true);
         let square = tensor.clone() * tensor.clone();
         let output = square + tensor.clone();
         output.backward();
@@ -191,7 +199,7 @@ mod tests {
     ) {
         // d(x*x)/dx = 2x
         // Each backward call contributes another gradient
-        let tensor = Tensor::new(value, [N]);
+        let tensor = Tensor::new(value, [N], true);
         let output = tensor.clone() * tensor.clone();
         output.backward();
         output.backward();
@@ -226,8 +234,8 @@ mod tests {
         expected_grad_lhs: [f32; N],
         expected_grad_rhs: [f32; N],
     ) {
-        let tensor_a = Tensor::new(lhs, [N]);
-        let tensor_b = Tensor::new(rhs, [N]);
+        let tensor_a = Tensor::new(lhs, [N], true);
+        let tensor_b = Tensor::new(rhs, [N], true);
         let tensor_c = tensor_a.clone() + tensor_b.clone();
         let tensor_d = tensor_c * tensor_a.clone();
         tensor_d.backward();
@@ -247,8 +255,8 @@ mod tests {
         "vector zero after backward"
     )]
     fn test_zero_grad_after_backward<const N: usize>(lhs: [f32; N], rhs: [f32; N]) {
-        let tensor_a = Tensor::new(lhs, [N]);
-        let tensor_b = Tensor::new(rhs, [N]);
+        let tensor_a = Tensor::new(lhs, [N], true);
+        let tensor_b = Tensor::new(rhs, [N], true);
         let output = tensor_a.clone() * tensor_b.clone();
         output.backward();
         tensor_a.fill_grad(0.0);
@@ -275,8 +283,8 @@ mod tests {
         rhs: [f32; N],
         expected_grad: [f32; N],
     ) {
-        let tensor_a = Tensor::new(lhs, [N]);
-        let tensor_b = Tensor::new(rhs, [N]);
+        let tensor_a = Tensor::new(lhs, [N], true);
+        let tensor_b = Tensor::new(rhs, [N], true);
         let output = tensor_a.clone() / tensor_b;
         output.backward();
         assert_eq!(tensor_a.state.borrow().grad, expected_grad);
@@ -294,10 +302,63 @@ mod tests {
         "vector negation"
     )]
     fn test_backward_negation<const N: usize>(value: [f32; N], expected_grad: [f32; N]) {
-        let tensor = Tensor::new(value, [N]);
+        let tensor = Tensor::new(value, [N], true);
         let output = -tensor.clone();
         output.backward();
         assert_eq!(tensor.state.borrow().grad, expected_grad);
+    }
+
+    /// Test that backward only accumulates gradients for tensors that require gradients.
+    #[test_case(
+        [2.0],
+        [3.0],
+        false,
+        false,
+        [0.0],
+        [0.0];
+        "scalar no tensors require grad"
+    )]
+    #[test_case(
+        [2.0],
+        [3.0],
+        true,
+        false,
+        [3.0],
+        [0.0];
+        "scalar only lhs requires grad"
+    )]
+    #[test_case(
+        [2.0],
+        [3.0],
+        false,
+        true,
+        [0.0],
+        [2.0];
+        "scalar only rhs requires grad"
+    )]
+    #[test_case(
+        [2.0, 3.0],
+        [4.0, 5.0],
+        true,
+        false,
+        [4.0, 5.0],
+        [0.0, 0.0];
+        "vector only lhs requires grad"
+    )]
+    fn test_backward_respects_requires_grad<const N: usize>(
+        lhs: [f32; N],
+        rhs: [f32; N],
+        lhs_requires_grad: bool,
+        rhs_requires_grad: bool,
+        expected_grad_lhs: [f32; N],
+        expected_grad_rhs: [f32; N],
+    ) {
+        let tensor_one = Tensor::new(lhs, [N], lhs_requires_grad);
+        let tensor_two = Tensor::new(rhs, [N], rhs_requires_grad);
+        let output = tensor_one.clone() * tensor_two.clone();
+        output.backward();
+        assert_eq!(tensor_one.state.borrow().grad, expected_grad_lhs);
+        assert_eq!(tensor_two.state.borrow().grad, expected_grad_rhs);
     }
 
     /// Test that backward seeds gradients on leaf tensors.
@@ -312,7 +373,7 @@ mod tests {
         "vector leaf"
     )]
     fn test_backward_leaf_tensor<const N: usize>(value: [f32; N], expected_grad: [f32; N]) {
-        let tensor = Tensor::new(value, [N]);
+        let tensor = Tensor::new(value, [N], true);
         tensor.backward();
         assert_eq!(tensor.state.borrow().grad, expected_grad);
     }

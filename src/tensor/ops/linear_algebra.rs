@@ -30,6 +30,7 @@ impl<T> Tensor<T> {
             data: vec![dot],
             shape: vec![],
             grad: vec![T::default(); 1],
+            requires_grad: self.requires_grad() || rhs.requires_grad(),
             node: None,
         })
     }
@@ -112,8 +113,8 @@ mod tests {
         expected_data: [i32; ED],
         expected_shape: [usize; ES],
     ) {
-        let tensor_one = Tensor::new(a, shape);
-        let tensor_two = Tensor::new(b, shape);
+        let tensor_one = Tensor::new(a, shape, true);
+        let tensor_two = Tensor::new(b, shape, true);
         let result = tensor_one.dot(&tensor_two);
         assert_eq!(result.state.borrow().data, expected_data);
         assert_eq!(result.state.borrow().shape, expected_shape);

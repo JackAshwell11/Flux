@@ -50,8 +50,8 @@ mod tests {
     /// Test that `zero_grad` correctly resets gradients to zero.
     #[test]
     fn test_zero_grad() {
-        let tensor_one = Tensor::new([0.5], [1]);
-        let tensor_two = Tensor::new([1.5], [1]);
+        let tensor_one = Tensor::new([0.5], [1], true);
+        let tensor_two = Tensor::new([1.5], [1], true);
         let optimiser = DummyOptimiser::new(vec![tensor_one.clone(), tensor_two.clone()]);
         tensor_one.fill_grad(-0.5);
         tensor_two.fill_grad(1.0);
