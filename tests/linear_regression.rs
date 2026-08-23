@@ -45,8 +45,8 @@ fn test_linear_regression() {
 
         // Compute the loss function and check that it's decreasing
         let loss = l2_loss(y_pred.clone(), y_tensor.clone());
-        assert!(loss.get(0) <= previous_loss + LOSS_TOLERANCE);
-        previous_loss = loss.get(0);
+        assert!(loss.data()[0] <= previous_loss + LOSS_TOLERANCE);
+        previous_loss = loss.data()[0];
 
         // Compute the backward pass to calculate the gradients
         loss.backward();
@@ -57,6 +57,6 @@ fn test_linear_regression() {
     }
 
     // Check that the output is correct
-    assert!((gradient.get(0) - EXPECTED_GRADIENT).abs() < EPSILON);
-    assert!((y_intercept.get(0) - EXPECTED_INTERCEPT).abs() < EPSILON);
+    assert!((gradient.data()[0] - EXPECTED_GRADIENT).abs() < EPSILON);
+    assert!((y_intercept.data()[0] - EXPECTED_INTERCEPT).abs() < EPSILON);
 }

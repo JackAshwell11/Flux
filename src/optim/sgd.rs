@@ -27,9 +27,10 @@ impl Optimiser for SGD {
     /// Performs a single step of the optimiser.
     fn step(&self) {
         for param in &self.params {
-            let mut state = param.state.borrow_mut();
-            for i in 0..state.data.len() {
-                state.data[i] = self.lr.mul_add(-state.grad[i], state.data[i]);
+            let grad = param.grad();
+            let mut data = param.data_mut();
+            for i in 0..data.len() {
+                data[i] = self.lr.mul_add(-grad[i], data[i]);
             }
         }
     }
@@ -53,7 +54,7 @@ mod tests {
         assert!(optimiser.params().contains(&tensor_two));
     }
 
-    /// Test that `step` correctly functions with various learning rates and graient values.
+    /// Test that `step` correctly functions with various learning rates and gradient values.
     #[test_case(0.1, 0.001, [0.099, 0.198])]
     #[test_case(1.0, 0.01, [0.99, 1.98])]
     #[test_case(2.0, 0.1, [1.9, 3.8])]
@@ -64,8 +65,8 @@ mod tests {
         tensor_one.fill_grad(1.0);
         tensor_two.fill_grad(2.0);
         optimiser.step();
-        assert_eq!(tensor_one.state.borrow().data, [expected[0]]);
-        assert_eq!(tensor_two.state.borrow().data, [expected[1]]);
+        assert_eq!(tensor_one.data(), [expected[0]]);
+        assert_eq!(tensor_two.data(), [expected[1]]);
     }
 
     /// Test that `step` correctly functions with only one tensor to optimise.
@@ -83,7 +84,7 @@ mod tests {
         tensor_one.fill_grad(1.0);
         tensor_two.fill_grad(1.0);
         optimiser.step();
-        assert_eq!(tensor_one.state.borrow().data, [expected[0]]);
-        assert_eq!(tensor_two.state.borrow().data, [expected[1]]);
+        assert_eq!(tensor_one.data(), [expected[0]]);
+        assert_eq!(tensor_two.data(), [expected[1]]);
     }
 }

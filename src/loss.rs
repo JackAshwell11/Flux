@@ -64,7 +64,7 @@ mod tests {
         let input_tensor = Tensor::new(input, input_shape, true);
         let target_tensor = Tensor::new(target, target_shape, true);
         let result = l1_loss(input_tensor, target_tensor);
-        assert!((result.state.borrow().data[0] - expected).abs() < 1e-6);
+        assert!((result.data()[0] - expected).abs() < 1e-6);
     }
 
     /// Test that the L2 loss function computes the correct result.
@@ -102,6 +102,6 @@ mod tests {
         let input_tensor = Tensor::new(input, input_shape, true);
         let target_tensor = Tensor::new(target, target_shape, true);
         let result = l2_loss(input_tensor, target_tensor);
-        assert!((result.state.borrow().data[0] - expected).abs() < 1e-6);
+        assert!((result.data()[0] - expected).abs() < 1e-6);
     }
 }

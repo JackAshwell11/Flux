@@ -56,7 +56,7 @@ mod tests {
         tensor_one.fill_grad(-0.5);
         tensor_two.fill_grad(1.0);
         optimiser.zero_grad();
-        assert_eq!(tensor_one.state.borrow().grad, vec![0.0]);
-        assert_eq!(tensor_two.state.borrow().grad, vec![0.0]);
+        assert_eq!(tensor_one.grad(), vec![0.0]);
+        assert_eq!(tensor_two.grad(), vec![0.0]);
     }
 }

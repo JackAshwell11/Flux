@@ -2,7 +2,7 @@ use crate::tensor::autograd::operations::{
     AddOperation, DivOperation, MulOperation, NegateOperation, SubOperation,
 };
 use crate::tensor::broadcast::broadcast_forward;
-use crate::tensor::core::{Operation, OperationNode, Tensor, TensorState, next_tensor_id};
+use crate::tensor::core::{Operation, OperationNode, Tensor};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 /// Compute the resultant elementwise operation with two tensors.
@@ -19,24 +19,21 @@ where
 {
     let size = lhs.size().max(rhs.size());
     let data = {
-        let lhs_state = lhs.state.borrow();
-        let rhs_state = rhs.state.borrow();
-        let lhs_data = broadcast_forward(&lhs_state.data, size);
-        let rhs_data = broadcast_forward(&rhs_state.data, size);
+        let lhs_data = broadcast_forward(lhs.data().as_ref(), size);
+        let rhs_data = broadcast_forward(rhs.data().as_ref(), size);
         lhs_data
             .iter()
             .zip(rhs_data.iter())
             .map(|(&x, &y)| f(x, y))
-            .collect()
+            .collect::<Vec<T>>()
     };
     let requires_grad = lhs.requires_grad() || rhs.requires_grad();
-    Tensor::from_state(TensorState {
-        id: next_tensor_id(),
+    Tensor::from_parts(
         data,
-        shape: vec![size],
-        grad: vec![T::default(); size],
+        vec![size],
+        vec![T::default(); size],
         requires_grad,
-        node: if requires_grad {
+        if requires_grad {
             Some(OperationNode {
                 parents: vec![lhs, rhs],
                 operation: Box::new(operation),
@@ -44,7 +41,7 @@ where
         } else {
             None
         },
-    })
+    )
 }
 
 /// Compute the resultant elementwise operation with a tensor and a scalar.
@@ -55,20 +52,18 @@ where
     O: Operation<T> + 'static,
 {
     let (data, shape) = {
-        let lhs_state = lhs.state.borrow();
         (
-            lhs_state.data.iter().map(|&x| f(x, rhs)).collect(),
-            lhs_state.shape.clone(),
+            lhs.data().iter().map(|&x| f(x, rhs)).collect::<Vec<T>>(),
+            lhs.shape(),
         )
     };
     let requires_grad = lhs.requires_grad();
-    Tensor::from_state(TensorState {
-        id: next_tensor_id(),
+    Tensor::from_parts(
         data,
         shape,
-        grad: vec![T::default(); lhs.size()],
+        vec![T::default(); lhs.size()],
         requires_grad,
-        node: if requires_grad {
+        if requires_grad {
             Some(OperationNode {
                 parents: vec![lhs],
                 operation: Box::new(operation),
@@ -76,7 +71,7 @@ where
         } else {
             None
         },
-    })
+    )
 }
 
 /// Compute the resultant elementwise operation with a single tensor.
@@ -87,20 +82,18 @@ where
     O: Operation<T> + 'static,
 {
     let (data, shape) = {
-        let state = tensor.state.borrow();
         (
-            state.data.iter().map(|&x| f(x)).collect(),
-            state.shape.clone(),
+            tensor.data().iter().map(|&x| f(x)).collect::<Vec<T>>(),
+            tensor.shape(),
         )
     };
     let requires_grad = tensor.requires_grad();
-    Tensor::from_state(TensorState {
-        id: next_tensor_id(),
+    Tensor::from_parts(
         data,
         shape,
-        grad: vec![T::default(); tensor.size()],
+        vec![T::default(); tensor.size()],
         requires_grad,
-        node: if requires_grad {
+        if requires_grad {
             Some(OperationNode {
                 parents: vec![tensor],
                 operation: Box::new(operation),
@@ -108,7 +101,7 @@ where
         } else {
             None
         },
-    })
+    )
 }
 
 /// Apply the resultant elementwise operation between a tensor and another tensor updating the
@@ -118,11 +111,8 @@ where
     T: Copy,
     F: Fn(T, T) -> T,
 {
-    let mut lhs_state = lhs.state.borrow_mut();
-    let rhs_state = rhs.state.borrow();
-    let rhs_data = broadcast_forward(&rhs_state.data, lhs_state.data.len());
-    lhs_state
-        .data
+    let rhs_data = broadcast_forward(rhs.data().as_ref(), lhs.data().len());
+    lhs.data_mut()
         .iter_mut()
         .zip(rhs_data.iter())
         .for_each(|(lhs_value, rhs_value)| {
@@ -137,8 +127,7 @@ where
     T: Copy,
     F: Fn(T, T) -> T,
 {
-    let mut lhs_state = lhs.state.borrow_mut();
-    for x in &mut lhs_state.data {
+    for x in lhs.data_mut().iter_mut() {
         *x = f(*x, rhs);
     }
 }
@@ -401,8 +390,8 @@ mod tests {
         let tensor_one = Tensor::new(a, a_shape, true);
         let tensor_two = Tensor::new(b, b_shape, true);
         let result = tensor_one + tensor_two;
-        assert_eq!(result.state.borrow().data, expected);
-        assert_eq!(result.state.borrow().shape, vec![expected.len()]);
+        assert_eq!(result.data(), expected);
+        assert_eq!(result.shape(), vec![expected.len()]);
     }
 
     /// Test that the tensor addition assignment operator works correctly.
@@ -446,7 +435,7 @@ mod tests {
         let mut tensor_one = Tensor::new(a, a_shape, true);
         let tensor_two = Tensor::new(b, b_shape, true);
         tensor_one += tensor_two;
-        assert_eq!(tensor_one.state.borrow().data, expected);
+        assert_eq!(tensor_one.data(), expected);
     }
 
     /// Test that the tensor addition assignment operator panics for unsupported sizes.
@@ -526,8 +515,8 @@ mod tests {
         let tensor_one = Tensor::new(a, a_shape, true);
         let tensor_two = Tensor::new(b, b_shape, true);
         let result = tensor_one - tensor_two;
-        assert_eq!(result.state.borrow().data, expected);
-        assert_eq!(result.state.borrow().shape, vec![expected.len()]);
+        assert_eq!(result.data(), expected);
+        assert_eq!(result.shape(), vec![expected.len()]);
     }
 
     /// Test that the tensor subtraction assignment operator works correctly.
@@ -571,7 +560,7 @@ mod tests {
         let mut tensor_one = Tensor::new(a, a_shape, true);
         let tensor_two = Tensor::new(b, b_shape, true);
         tensor_one -= tensor_two;
-        assert_eq!(tensor_one.state.borrow().data, expected);
+        assert_eq!(tensor_one.data(), expected);
     }
 
     /// Test that the tensor subtraction assignment operator panics for unsupported sizes.
@@ -651,8 +640,8 @@ mod tests {
         let tensor_one = Tensor::new(a, a_shape, true);
         let tensor_two = Tensor::new(b, b_shape, true);
         let result = tensor_one * tensor_two;
-        assert_eq!(result.state.borrow().data, expected);
-        assert_eq!(result.state.borrow().shape, vec![expected.len()]);
+        assert_eq!(result.data(), expected);
+        assert_eq!(result.shape(), vec![expected.len()]);
     }
 
     /// Test that the tensor multiplication assignment operator works correctly.
@@ -696,7 +685,7 @@ mod tests {
         let mut tensor_one = Tensor::new(a, a_shape, true);
         let tensor_two = Tensor::new(b, b_shape, true);
         tensor_one *= tensor_two;
-        assert_eq!(tensor_one.state.borrow().data, expected);
+        assert_eq!(tensor_one.data(), expected);
     }
 
     /// Test that the tensor multiplication assignment operator panics for unsupported sizes.
@@ -776,8 +765,8 @@ mod tests {
         let tensor_one = Tensor::new(a, a_shape, true);
         let tensor_two = Tensor::new(b, b_shape, true);
         let result = tensor_one / tensor_two;
-        assert_eq!(result.state.borrow().data, expected);
-        assert_eq!(result.state.borrow().shape, vec![expected.len()]);
+        assert_eq!(result.data(), expected);
+        assert_eq!(result.shape(), vec![expected.len()]);
     }
 
     /// Test that the tensor division assignment operator works correctly.
@@ -821,7 +810,7 @@ mod tests {
         let mut tensor_one = Tensor::new(a, a_shape, true);
         let tensor_two = Tensor::new(b, b_shape, true);
         tensor_one /= tensor_two;
-        assert_eq!(tensor_one.state.borrow().data, expected);
+        assert_eq!(tensor_one.data(), expected);
     }
 
     /// Test that the tensor division assignment operator panics for unsupported sizes.

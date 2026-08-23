@@ -15,7 +15,7 @@ fn walk_graph<T, Pre, Post>(
     Post: FnMut(&Tensor<T>),
 {
     // Check if this tensor has already been visited or not
-    if !visited.insert(tensor.state.borrow().id) {
+    if !visited.insert(tensor.id()) {
         return;
     }
 
@@ -24,9 +24,8 @@ fn walk_graph<T, Pre, Post>(
 
     // Visit the node's parents if it exists
     let parents = {
-        let tensor_state = tensor.state.borrow();
-        tensor_state
-            .node
+        tensor
+            .node()
             .as_ref()
             .map(|node| node.parents.clone())
             .unwrap_or_default()
@@ -64,15 +63,10 @@ where
                 };
 
                 // Print out this tensor's data
-                let tensor_state = tensor.state.borrow();
-                let new_str = match &tensor_state.node {
-                    Some(node) => {
-                        format!("{prefix}Node {} {:?}", tensor_state.id, node.operation)
-                    }
-                    None => {
-                        format!("{prefix}Leaf {:?}", tensor_state.data)
-                    }
-                };
+                let new_str = tensor.node().as_ref().map_or_else(
+                    || format!("{prefix}Leaf {:?}", tensor.data()),
+                    |node| format!("{prefix}Node {} {:?}", tensor.id(), node.operation),
+                );
                 output.push_str(&new_str);
             },
             &mut |_| {},
@@ -94,63 +88,66 @@ pub(crate) fn topological_sort<T>(tensor: &Tensor<T>) -> Vec<Tensor<T>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tensor::autograd::operations::AddOperation;
-    use crate::tensor::core::{OperationNode, Tensor};
+    use crate::tensor::core::Tensor;
     use std::collections::HashSet;
     use test_case::test_case;
 
-    /// A helper to construct a computation graph from node definitions.
-    fn build_test_graph(nodes: Vec<(Tensor<f32>, Vec<usize>)>) -> Vec<Tensor<f32>> {
-        let mut tensors: Vec<Tensor<f32>> = Vec::with_capacity(nodes.len());
-        for (tensor, parents_indices) in nodes {
-            if !parents_indices.is_empty() {
-                tensor.state.borrow_mut().node = Some(OperationNode {
-                    parents: parents_indices
-                        .iter()
-                        .map(|&i| tensors[i].clone())
-                        .collect(),
-                    operation: Box::new(AddOperation),
-                });
-            }
-            tensors.push(tensor);
-        }
-        tensors
+    /// The type of a function that builds a computation graph.
+    type GraphBuilder = fn() -> Vec<Tensor<f32>>;
+
+    /// A helper to construct a computation graph with a single tensor.
+    fn single_tensor_graph() -> Vec<Tensor<f32>> {
+        vec![Tensor::new([1.0], [1], true)]
+    }
+
+    /// A helper to construct a computation graph with three tensors.
+    fn three_node_graph() -> Vec<Tensor<f32>> {
+        let tensor_a = Tensor::new([1.0, 2.0], [2], true);
+        let tensor_b = Tensor::new([3.0, 4.0], [2], true);
+        let tensor_c = tensor_a.clone() * tensor_b.clone();
+        vec![tensor_a, tensor_b, tensor_c]
+    }
+
+    /// A helper to construct a computation graph with four tensors.
+    fn four_node_complex_graph() -> Vec<Tensor<f32>> {
+        let tensor_a = Tensor::new([1.0], [1], true);
+        let tensor_b = Tensor::new([2.0], [1], true);
+        let tensor_c = tensor_a.clone() + tensor_b.clone();
+        let tensor_d = tensor_c.clone() + tensor_b.clone();
+        vec![tensor_a, tensor_b, tensor_c, tensor_d]
+    }
+
+    /// A helper to construct a computation graph with multiple branches.
+    fn multi_branch_graph() -> Vec<Tensor<f32>> {
+        let tensor_a = Tensor::new([1.0], [1], true);
+        let tensor_b = Tensor::new([2.0], [1], true);
+        let tensor_c = tensor_a.clone() + tensor_b.clone();
+        let tensor_d = Tensor::new([4.0], [1], true);
+        let tensor_e = tensor_c.clone() + tensor_d.clone();
+        let tensor_f = tensor_c.clone() + tensor_e.clone();
+        vec![tensor_a, tensor_b, tensor_c, tensor_d, tensor_e, tensor_f]
+    }
+
+    /// A helper to construct a computation graph with a diamond dependency.
+    fn diamond_dependency_graph() -> Vec<Tensor<f32>> {
+        let tensor_a = Tensor::new([1.0], [1], true);
+        let tensor_b = Tensor::new([2.0], [1], true);
+        let tensor_c = tensor_a.clone() + tensor_b.clone();
+        let tensor_d = tensor_a.clone() + tensor_c.clone();
+        let tensor_e = tensor_c.clone() + tensor_d.clone();
+        vec![tensor_a, tensor_b, tensor_c, tensor_d, tensor_e]
     }
 
     /// Test that walking the graph is performed correctly.
-    #[test_case(
-        vec![(Tensor::new([1.0], [1], true), vec![])],
-        [0],
-        [0];
-        "single tensor graph"
-    )]
-    #[test_case(
-        vec![
-            (Tensor::new([1.0], [1], true), vec![]),
-            (Tensor::new([2.0], [1], true), vec![]),
-            (Tensor::new([3.0], [1], true), vec![0, 1]),
-        ],
-        [2, 0, 1],
-        [0, 1, 2];
-        "three node DAG"
-    )]
-    #[test_case(
-        vec![
-            (Tensor::new([1.0], [1], true), vec![]),
-            (Tensor::new([2.0], [1], true), vec![]),
-            (Tensor::new([3.0], [1], true), vec![0, 1]),
-            (Tensor::new([4.0], [1], true), vec![2, 1]),
-        ],
-        [3, 2, 0, 1],
-        [0, 1, 2, 3];
-        "four node complex DAG"
-    )]
-    fn test_walk_graph<const PRE: usize, const POST: usize>(
-        nodes: Vec<(Tensor<f32>, Vec<usize>)>,
-        expected_pre_indices: [usize; PRE],
-        expected_post_indices: [usize; POST],
+    #[test_case(super::single_tensor_graph, [0], [0]; "single tensor graph")]
+    #[test_case(super::three_node_graph, [2, 0, 1], [0, 1, 2]; "three node DAG")]
+    #[test_case(super::four_node_complex_graph, [3, 2, 0, 1], [0, 1, 2, 3]; "four node complex DAG")]
+    fn test_walk_graph<const E: usize>(
+        build_graph: GraphBuilder,
+        expected_pre_indices: [usize; E],
+        expected_post_indices: [usize; E],
     ) {
-        let tensors = build_test_graph(nodes);
+        let tensors = build_graph();
         let mut pre_order = vec![];
         let mut post_order = vec![];
         walk_graph(
@@ -184,63 +181,22 @@ mod tests {
         let tensor_c = tensor_a * tensor_b;
         let expected_output = format!(
             "Node {} MulOperation├── Leaf [1.0, 2.0]├── Leaf [3.0, 4.0]",
-            tensor_c.state.borrow().id
+            tensor_c.id()
         );
         assert_eq!(tensor_c.print_graph(), expected_output);
     }
 
     /// Test that a tensor graph can be sorted topologically correctly.
-    #[test_case(
-        vec![(Tensor::new([1.0], [1], true), vec![])],
-        [0];
-        "single tensor graph"
-    )]
-    #[test_case(
-        vec![
-            (Tensor::new([1.0], [1], true), vec![]),
-            (Tensor::new([2.0], [1], true), vec![]),
-            (Tensor::new([3.0], [1], true), vec![0, 1]),
-        ],
-        [0, 1, 2];
-        "three node DAG"
-    )]
-    #[test_case(
-        vec![
-            (Tensor::new([1.0], [1], true), vec![]),
-            (Tensor::new([2.0], [1], true), vec![]),
-            (Tensor::new([3.0], [1], true), vec![0, 1]),
-            (Tensor::new([4.0], [1], true), vec![2, 1]),
-        ],
-        [0, 1, 2, 3];
-        "four node complex DAG"
-    )]
-    #[test_case(
-        vec![
-            (Tensor::new([1.0], [1], true), vec![]),
-            (Tensor::new([2.0], [1], true), vec![]),
-            (Tensor::new([3.0], [1], true), vec![0, 1]),
-            (Tensor::new([4.0], [1], true), vec![2]),
-            (Tensor::new([5.0], [1], true), vec![2, 3]),
-        ],
-        [0, 1, 2, 3, 4];
-        "complex multi-branch DAG"
-    )]
-    #[test_case(
-        vec![
-            (Tensor::new([1.0], [1], true), vec![]),
-            (Tensor::new([2.0], [1], true), vec![0]),
-            (Tensor::new([3.0], [1], true), vec![0]),
-            (Tensor::new([4.0], [1], true), vec![1, 2]),
-            (Tensor::new([5.0], [1], true), vec![3, 0]),
-        ],
-        [0, 1, 2, 3, 4];
-        "diamond dependency DAG with shared leaf"
-    )]
+    #[test_case(super::single_tensor_graph, [0]; "single tensor graph")]
+    #[test_case(super::three_node_graph, [0, 1, 2]; "three node DAG")]
+    #[test_case(super::four_node_complex_graph, [0, 1, 2, 3]; "four node complex DAG")]
+    #[test_case(super::multi_branch_graph, [0, 1, 2, 3, 4, 5]; "complex multi-branch DAG")]
+    #[test_case(super::diamond_dependency_graph, [0, 1, 2, 3, 4]; "diamond dependency DAG")]
     fn test_topological_sort<const E: usize>(
-        nodes: Vec<(Tensor<f32>, Vec<usize>)>,
+        build_graph: GraphBuilder,
         expected_sorted_indices: [usize; E],
     ) {
-        let tensors = build_test_graph(nodes);
+        let tensors = build_graph();
         let sorted_tensors = topological_sort(&tensors.last().unwrap().clone());
         assert_eq!(
             sorted_tensors,
