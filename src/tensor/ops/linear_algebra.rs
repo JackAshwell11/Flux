@@ -1,5 +1,4 @@
 use crate::tensor::core::Tensor;
-use crate::tensor::core::{TensorState, next_tensor_id};
 use std::ops::{Add, Mul};
 
 impl<T> Tensor<T> {
@@ -14,25 +13,21 @@ impl<T> Tensor<T> {
         T: Copy + Mul<Output = T> + Add<Output = T> + Default,
     {
         let dot = {
-            let lhs_state = self.state.borrow();
-            let rhs_state = rhs.state.borrow();
-            assert_eq!(lhs_state.shape, rhs_state.shape);
-            lhs_state
-                .data
+            assert_eq!(self.shape(), rhs.shape());
+            self.data()
                 .iter()
-                .zip(rhs_state.data.iter())
+                .zip(rhs.data().iter())
                 .map(|(a, b)| *a * *b)
                 .reduce(|a, b| a + b)
                 .unwrap()
         };
-        Self::from_state(TensorState {
-            id: next_tensor_id(),
-            data: vec![dot],
-            shape: vec![],
-            grad: vec![T::default(); 1],
-            requires_grad: self.requires_grad() || rhs.requires_grad(),
-            node: None,
-        })
+        Self::from_parts(
+            vec![dot],
+            vec![],
+            vec![T::default(); 1],
+            self.requires_grad() || rhs.requires_grad(),
+            None,
+        )
     }
 }
 
@@ -116,7 +111,7 @@ mod tests {
         let tensor_one = Tensor::new(a, shape, true);
         let tensor_two = Tensor::new(b, shape, true);
         let result = tensor_one.dot(&tensor_two);
-        assert_eq!(result.state.borrow().data, expected_data);
-        assert_eq!(result.state.borrow().shape, expected_shape);
+        assert_eq!(result.data(), expected_data);
+        assert_eq!(result.shape(), expected_shape);
     }
 }

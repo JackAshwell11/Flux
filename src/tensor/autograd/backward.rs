@@ -1,6 +1,6 @@
 use crate::tensor::autograd::graph::topological_sort;
 use crate::tensor::broadcast::broadcast_backward;
-use crate::tensor::core::{Tensor, TensorState, next_tensor_id};
+use crate::tensor::core::Tensor;
 use num_traits::One;
 use std::fmt::Debug;
 use std::ops::AddAssign;
@@ -11,9 +11,9 @@ where
 {
     /// Accumulates incoming gradients into this tensor's gradient.
     pub fn accumulate_grad(&self, incoming: &[T]) {
-        let mut state = self.state.borrow_mut();
-        let incoming = broadcast_backward(incoming, state.grad.len());
-        for (existing, incoming) in state.grad.iter_mut().zip(incoming.iter()) {
+        let mut grad = self.grad_mut();
+        let incoming = broadcast_backward(incoming, grad.len());
+        for (existing, incoming) in grad.iter_mut().zip(incoming.iter()) {
             *existing += *incoming;
         }
     }
@@ -25,7 +25,7 @@ where
 {
     /// Fills the gradient values with the provided value.
     pub fn fill_grad(&self, value: T) {
-        self.state.borrow_mut().grad.fill(value);
+        self.grad_mut().fill(value);
     }
 }
 
@@ -49,25 +49,16 @@ where
         // Backpropagate the gradients in reverse topological order
         for tensor in topological_order.iter().rev() {
             // Get the gradient tensor for this tensor
-            let tensor_state = tensor.state.borrow();
-            let output_grad = Self::from_state(TensorState {
-                id: next_tensor_id(),
-                data: tensor_state.grad.clone(),
-                shape: tensor_state.shape.clone(),
-                grad: tensor_state.grad.clone(),
-                requires_grad: false,
-                node: None,
-            });
+            let output_grad = Self::new(tensor.grad(), tensor.shape(), false);
 
             // Apply the backward operation to this tensor's node
-            if let Some(node) = tensor_state.node.as_ref() {
+            if let Some(node) = tensor.node().as_ref() {
                 node.parents
                     .iter()
                     .zip(node.operation.backward(&output_grad, &node.parents))
                     .for_each(|(parent, grad)| {
                         if parent.requires_grad() {
-                            let state = grad.state.borrow();
-                            parent.accumulate_grad(&state.data);
+                            parent.accumulate_grad(&grad.data());
                         }
                     });
             }
@@ -99,9 +90,9 @@ mod tests {
         expected: [f32; N],
     ) {
         let tensor = Tensor::new([0.0; N], [N], true);
-        tensor.state.borrow_mut().grad = initial.to_vec();
+        *tensor.grad_mut() = initial.to_vec();
         tensor.accumulate_grad(&incoming);
-        assert_eq!(tensor.state.borrow().grad, expected);
+        assert_eq!(tensor.grad(), expected);
     }
 
     /// Test that gradients can be filled with a value.
@@ -119,9 +110,9 @@ mod tests {
     )]
     fn test_fill_grad<const N: usize>(initial: [f32; N], value: f32, expected: [f32; N]) {
         let tensor = Tensor::new([1.0; N], [N], true);
-        tensor.state.borrow_mut().grad = initial.to_vec();
+        *tensor.grad_mut() = initial.to_vec();
         tensor.fill_grad(value);
-        assert_eq!(tensor.state.borrow().grad, expected);
+        assert_eq!(tensor.grad(), expected);
     }
 
     /// Test reverse-mode differentiation through a simple graph.
@@ -151,10 +142,10 @@ mod tests {
         let tensor_a = Tensor::new(lhs, [N], true);
         let tensor_b = Tensor::new(rhs, [N], true);
         let tensor_c = tensor_a.clone() * tensor_b.clone();
-        assert_eq!(tensor_c.state.borrow().data, expected_output);
+        assert_eq!(tensor_c.data(), expected_output);
         tensor_c.backward();
-        assert_eq!(tensor_a.state.borrow().grad, expected_grad_lhs);
-        assert_eq!(tensor_b.state.borrow().grad, expected_grad_rhs);
+        assert_eq!(tensor_a.grad(), expected_grad_lhs);
+        assert_eq!(tensor_b.grad(), expected_grad_rhs);
     }
 
     /// Test that gradients accumulate through shared graph branches.
@@ -179,7 +170,7 @@ mod tests {
         let square = tensor.clone() * tensor.clone();
         let output = square + tensor.clone();
         output.backward();
-        assert_eq!(tensor.state.borrow().grad, expected_grad);
+        assert_eq!(tensor.grad(), expected_grad);
     }
 
     /// Test that gradients accumulate through multiple backward calls.
@@ -203,7 +194,7 @@ mod tests {
         let output = tensor.clone() * tensor.clone();
         output.backward();
         output.backward();
-        assert_eq!(tensor.state.borrow().grad, expected_grad);
+        assert_eq!(tensor.grad(), expected_grad);
     }
 
     /// Test that gradients propagate through chained operations.
@@ -239,8 +230,8 @@ mod tests {
         let tensor_c = tensor_a.clone() + tensor_b.clone();
         let tensor_d = tensor_c * tensor_a.clone();
         tensor_d.backward();
-        assert_eq!(tensor_a.state.borrow().grad, expected_grad_lhs);
-        assert_eq!(tensor_b.state.borrow().grad, expected_grad_rhs);
+        assert_eq!(tensor_a.grad(), expected_grad_lhs);
+        assert_eq!(tensor_b.grad(), expected_grad_rhs);
     }
 
     /// Test that `zero_grad()` clears gradients after backward.
@@ -261,8 +252,8 @@ mod tests {
         output.backward();
         tensor_a.fill_grad(0.0);
         tensor_b.fill_grad(0.0);
-        assert_eq!(tensor_a.state.borrow().grad, vec![0.0; N]);
-        assert_eq!(tensor_b.state.borrow().grad, vec![0.0; N]);
+        assert_eq!(tensor_a.grad(), vec![0.0; N]);
+        assert_eq!(tensor_b.grad(), vec![0.0; N]);
     }
 
     /// Test gradient propagation through division.
@@ -287,7 +278,7 @@ mod tests {
         let tensor_b = Tensor::new(rhs, [N], true);
         let output = tensor_a.clone() / tensor_b;
         output.backward();
-        assert_eq!(tensor_a.state.borrow().grad, expected_grad);
+        assert_eq!(tensor_a.grad(), expected_grad);
     }
 
     /// Test gradient propagation through negation.
@@ -305,7 +296,7 @@ mod tests {
         let tensor = Tensor::new(value, [N], true);
         let output = -tensor.clone();
         output.backward();
-        assert_eq!(tensor.state.borrow().grad, expected_grad);
+        assert_eq!(tensor.grad(), expected_grad);
     }
 
     /// Test that backward only accumulates gradients for tensors that require gradients.
@@ -357,8 +348,8 @@ mod tests {
         let tensor_two = Tensor::new(rhs, [N], rhs_requires_grad);
         let output = tensor_one.clone() * tensor_two.clone();
         output.backward();
-        assert_eq!(tensor_one.state.borrow().grad, expected_grad_lhs);
-        assert_eq!(tensor_two.state.borrow().grad, expected_grad_rhs);
+        assert_eq!(tensor_one.grad(), expected_grad_lhs);
+        assert_eq!(tensor_two.grad(), expected_grad_rhs);
     }
 
     /// Test that backward seeds gradients on leaf tensors.
@@ -375,6 +366,6 @@ mod tests {
     fn test_backward_leaf_tensor<const N: usize>(value: [f32; N], expected_grad: [f32; N]) {
         let tensor = Tensor::new(value, [N], true);
         tensor.backward();
-        assert_eq!(tensor.state.borrow().grad, expected_grad);
+        assert_eq!(tensor.grad(), expected_grad);
     }
 }
