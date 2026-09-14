@@ -1,7 +1,7 @@
 use crate::tensor::core::{Operation, Tensor};
-use num_traits::{NumCast, One};
+use num_traits::{NumCast, One, Zero};
 use std::fmt::Debug;
-use std::ops::{AddAssign, Div, Mul, Neg};
+use std::ops::{AddAssign, Div, Mul, MulAssign, Neg};
 
 /// The add operation for the autograd engine.
 #[derive(Debug)]
@@ -29,6 +29,32 @@ pub(crate) struct MeanOperation {
 /// The negate operation for the autograd engine.
 #[derive(Debug)]
 pub(crate) struct NegateOperation;
+
+/// The dot product operation for the autograd engine.
+#[derive(Debug)]
+pub(crate) struct DotOperation;
+
+/// The summation operation for the autograd engine.
+#[derive(Debug)]
+pub(crate) struct SumOperation;
+
+/// The absolute value operation for the autograd engine.
+#[derive(Debug)]
+pub(crate) struct AbsOperation;
+
+/// The minimum operation for the autograd engine.
+#[derive(Debug)]
+pub(crate) struct MinOperation<T> {
+    // The indexes of the elements that are considered to be the minimum.
+    pub(crate) mask: Vec<T>,
+}
+
+/// The maximum operation for the autograd engine.
+#[derive(Debug)]
+pub(crate) struct MaxOperation<T> {
+    // The indexes of the elements that are considered to be the maximum.
+    pub(crate) mask: Vec<T>,
+}
 
 impl<T> Operation<T> for AddOperation
 where
@@ -108,6 +134,88 @@ where
     fn backward(&self, grad_output: &Tensor<T>, _parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
         // d(-a)/da = -1
         vec![-grad_output.clone()]
+    }
+}
+
+impl<T> Operation<T> for DotOperation
+where
+    T: Copy + AddAssign + Default + Mul<Output = T>,
+{
+    /// Propagates the incoming gradient through the dot product operation to both inputs.
+    fn backward(&self, grad_output: &Tensor<T>, parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
+        // d(a·b)/da = b
+        // d(a·b)/db = a
+        let lhs = &parents[0];
+        let rhs = &parents[1];
+        vec![
+            grad_output.clone() * rhs.clone(),
+            grad_output.clone() * lhs.clone(),
+        ]
+    }
+}
+
+impl<T> Operation<T> for SumOperation
+where
+    T: Copy + One + Mul<Output = T>,
+{
+    /// Propagates the incoming gradient through the summation operation to its input.
+    fn backward(&self, grad_output: &Tensor<T>, _parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
+        // d(sum(a))/da_i = 1
+        vec![grad_output.clone()]
+    }
+}
+
+impl<T> Operation<T> for AbsOperation
+where
+    T: Copy + AddAssign + Default + PartialOrd + Zero + One + Neg<Output = T>,
+{
+    /// Propagates the incoming gradient through the absolute value operation to its input.
+    fn backward(&self, grad_output: &Tensor<T>, parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
+        // d(|a|)/da = sign(a)
+        let gradient = parents[0].map(|x| {
+            if x > T::zero() {
+                T::one()
+            } else if x < T::zero() {
+                -T::one()
+            } else {
+                T::zero()
+            }
+        });
+        vec![grad_output.clone() * gradient]
+    }
+}
+
+/// Computes a new gradient tensor by multiplying the incoming gradient tensor with a mask.
+fn mask_gradient<T>(mask: &[T], grad_output: &Tensor<T>) -> Tensor<T>
+where
+    T: Copy + MulAssign,
+{
+    let grad = grad_output.clone();
+    for (value, &mask) in grad.data_mut().iter_mut().zip(mask.iter()) {
+        *value *= mask;
+    }
+    grad
+}
+
+impl<T> Operation<T> for MinOperation<T>
+where
+    T: Copy + MulAssign + Debug,
+{
+    /// Propagates the incoming gradient through the minimum operation to its input.
+    fn backward(&self, grad_output: &Tensor<T>, _parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
+        // d(min(a))/da_i = grad_output_i if a_i is a minimum, otherwise 0
+        vec![mask_gradient(&self.mask, grad_output)]
+    }
+}
+
+impl<T> Operation<T> for MaxOperation<T>
+where
+    T: Copy + MulAssign + Debug,
+{
+    /// Propagates the incoming gradient through the maximum operation to its input.
+    fn backward(&self, grad_output: &Tensor<T>, _parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
+        // d(max(a))/da_i = grad_output_i if a_i is a maximum, otherwise 0
+        vec![mask_gradient(&self.mask, grad_output)]
     }
 }
 
@@ -220,6 +328,138 @@ mod tests {
     fn test_neg_backward<const N: usize>(grad_output: [f32; N], expected: [f32; N]) {
         let grad_output = Tensor::new(grad_output, [N], true);
         let gradients = NegateOperation.backward(&grad_output, &[]);
+        assert_eq!(gradients[0].data(), expected);
+    }
+
+    /// Test that the dot product operation computes correct gradients.
+    #[test_case(
+        [2.0],
+        [3.0],
+        [1.0],
+        [[3.0], [2.0]];
+        "scalar"
+    )]
+    #[test_case(
+        [2.0, 4.0],
+        [3.0, 5.0],
+        [1.0, 1.0],
+        [[3.0, 5.0], [2.0, 4.0]];
+        "vector"
+    )]
+    fn test_dot_backward<const N: usize>(
+        lhs: [f32; N],
+        rhs: [f32; N],
+        grad_output: [f32; N],
+        expected: [[f32; N]; 2],
+    ) {
+        let lhs = Tensor::new(lhs, [N], true);
+        let rhs = Tensor::new(rhs, [N], true);
+        let grad_output = Tensor::new(grad_output, [N], true);
+        let gradients = DotOperation.backward(&grad_output, &[lhs, rhs]);
+        assert_eq!(gradients[0].data(), expected[0]);
+        assert_eq!(gradients[1].data(), expected[1]);
+    }
+
+    /// Test that the sum operation computes correct gradients.
+    #[test_case([1.0], [1.0]; "scalar")]
+    #[test_case([1.0, 1.0, 1.0], [1.0, 1.0, 1.0]; "vector")]
+    fn test_sum_backward<const N: usize>(grad_output: [f32; N], expected: [f32; N]) {
+        let grad_output = Tensor::new(grad_output, [N], true);
+        let gradients = SumOperation.backward(&grad_output, &[]);
+        assert_eq!(gradients[0].data(), expected);
+    }
+
+    /// Test that the absolute value operation computes correct gradients.
+    #[test_case(
+        [2.0],
+        [3.0],
+        [3.0];
+        "positive scalar"
+    )]
+    #[test_case(
+        [-2.0],
+        [3.0],
+        [-3.0];
+        "negative scalar"
+    )]
+    #[test_case(
+        [0.0],
+        [3.0],
+        [0.0];
+        "zero scalar"
+    )]
+    #[test_case(
+        [-2.0, 0.0, 4.0],
+        [3.0, 3.0, 3.0],
+        [-3.0, 0.0, 3.0];
+        "mixed vector"
+    )]
+    fn test_abs_backward<const N: usize>(
+        input: [f32; N],
+        grad_output: [f32; N],
+        expected: [f32; N],
+    ) {
+        let input = Tensor::new(input, [N], true);
+        let grad_output = Tensor::new(grad_output, [N], true);
+        let gradients = AbsOperation.backward(&grad_output, &[input]);
+        assert_eq!(gradients[0].data(), expected);
+    }
+
+    /// Test that the minimum operation computes correct gradients.
+    #[test_case(
+        vec![1.0],
+        [2.0],
+        [2.0];
+        "selected scalar"
+    )]
+    #[test_case(
+        vec![0.0],
+        [2.0],
+        [0.0];
+        "unselected scalar"
+    )]
+    #[test_case(
+        vec![1.0, 0.0, 1.0],
+        [2.0, 3.0, 4.0],
+        [2.0, 0.0, 4.0];
+        "multiple selected values"
+    )]
+    fn test_min_backward<const N: usize>(
+        mask: Vec<f32>,
+        grad_output: [f32; N],
+        expected: [f32; N],
+    ) {
+        let grad_output = Tensor::new(grad_output, [N], true);
+        let gradients = MinOperation { mask }.backward(&grad_output, &[]);
+        assert_eq!(gradients[0].data(), expected);
+    }
+
+    /// Test that the maximum operation computes correct gradients.
+    #[test_case(
+        vec![1.0],
+        [2.0],
+        [2.0];
+        "selected scalar"
+    )]
+    #[test_case(
+        vec![0.0],
+        [2.0],
+        [0.0];
+        "unselected scalar"
+    )]
+    #[test_case(
+        vec![0.0, 1.0, 1.0],
+        [2.0, 3.0, 4.0],
+        [0.0, 3.0, 4.0];
+        "multiple selected values"
+    )]
+    fn test_max_backward<const N: usize>(
+        mask: Vec<f32>,
+        grad_output: [f32; N],
+        expected: [f32; N],
+    ) {
+        let grad_output = Tensor::new(grad_output, [N], true);
+        let gradients = MaxOperation { mask }.backward(&grad_output, &[]);
         assert_eq!(gradients[0].data(), expected);
     }
 }

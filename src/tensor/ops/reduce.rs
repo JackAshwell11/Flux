@@ -1,13 +1,15 @@
-use crate::tensor::autograd::operations::MeanOperation;
-use crate::tensor::core::{OperationNode, Tensor};
-use num_traits::Float;
+use crate::tensor::autograd::operations::{
+    AbsOperation, MaxOperation, MeanOperation, MinOperation, SumOperation,
+};
+use crate::tensor::core::{Operation, OperationNode, Tensor};
+use num_traits::{Float, One};
 use std::fmt::Debug;
 use std::iter::Sum;
-use std::ops::AddAssign;
+use std::ops::{AddAssign, MulAssign};
 
 impl<T> Tensor<T>
 where
-    T: Sum + Copy + Default,
+    T: Sum + Copy + Default + One,
 {
     /// Sum the elements of a tensor.
     #[must_use]
@@ -17,14 +19,21 @@ where
             vec![],
             vec![T::default(); 1],
             self.requires_grad(),
-            None,
+            if self.requires_grad() {
+                Some(OperationNode {
+                    parents: vec![self.clone()],
+                    operation: Box::new(SumOperation),
+                })
+            } else {
+                None
+            },
         )
     }
 }
 
 impl<T> Tensor<T>
 where
-    T: Float + Default,
+    T: Float + Default + AddAssign,
 {
     /// Compute the absolute value of a tensor.
     #[must_use]
@@ -36,12 +45,20 @@ where
             )
         };
         let num_elements = data.len();
+        let requires_grad = self.requires_grad();
         Self::from_parts(
             data,
             shape,
             vec![T::default(); num_elements],
-            self.requires_grad(),
-            None,
+            requires_grad,
+            if requires_grad {
+                Some(OperationNode {
+                    parents: vec![self.clone()],
+                    operation: Box::new(AbsOperation),
+                })
+            } else {
+                None
+            },
         )
     }
 }
@@ -83,35 +100,55 @@ where
 
 impl<T> Tensor<T>
 where
-    T: Copy + PartialOrd + Default,
+    T: Copy + Debug + PartialOrd + Default + One + MulAssign + 'static,
 {
     /// Compute the minimum or maximum value in the iterator and return it as a scalar tensor.
-    fn compute_min_max(&self, comparator: impl Fn(T, T) -> bool) -> Self {
+    fn compute_min_max<O>(
+        &self,
+        comparator: impl Fn(T, T) -> bool,
+        operator: impl Fn(Vec<T>) -> O,
+    ) -> Self
+    where
+        O: Operation<T> + 'static,
+    {
         let result = self
             .data()
             .iter()
             .copied()
             .reduce(|a, b| if comparator(a, b) { a } else { b })
             .expect("Tensor is empty");
+        let mask = self
+            .data()
+            .iter()
+            .map(|&x| if x == result { T::one() } else { T::default() })
+            .collect::<Vec<_>>();
+        let requires_grad = self.requires_grad();
         Self::from_parts(
             vec![result],
             vec![],
             vec![T::default(); 1],
-            self.requires_grad(),
-            None,
+            requires_grad,
+            if requires_grad {
+                Some(OperationNode {
+                    parents: vec![self.clone()],
+                    operation: Box::new(operator(mask)),
+                })
+            } else {
+                None
+            },
         )
     }
 
     /// Get the minimum value of the tensor.
     #[must_use]
     pub fn min(&self) -> Self {
-        self.compute_min_max(|a, b| a <= b)
+        self.compute_min_max(|a, b| a <= b, |mask| MinOperation { mask })
     }
 
     /// Get the maximum value of the tensor.
     #[must_use]
     pub fn max(&self) -> Self {
-        self.compute_min_max(|a, b| a >= b)
+        self.compute_min_max(|a, b| a >= b, |mask| MaxOperation { mask })
     }
 }
 
