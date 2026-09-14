@@ -1,7 +1,11 @@
-use crate::tensor::core::Tensor;
-use std::ops::{Add, Mul};
+use crate::tensor::autograd::operations::DotOperation;
+use crate::tensor::core::{OperationNode, Tensor};
+use std::ops::{Add, AddAssign, Mul};
 
-impl<T> Tensor<T> {
+impl<T> Tensor<T>
+where
+    T: AddAssign,
+{
     /// Perform a dot product on two tensors of the same shape.
     ///
     /// # Panics
@@ -21,12 +25,20 @@ impl<T> Tensor<T> {
                 .reduce(|a, b| a + b)
                 .unwrap()
         };
+        let requires_grad = self.requires_grad() || rhs.requires_grad();
         Self::from_parts(
             vec![dot],
             vec![],
             vec![T::default(); 1],
-            self.requires_grad() || rhs.requires_grad(),
-            None,
+            requires_grad,
+            if requires_grad {
+                Some(OperationNode {
+                    parents: vec![self.clone(), rhs.clone()],
+                    operation: Box::new(DotOperation),
+                })
+            } else {
+                None
+            },
         )
     }
 }
