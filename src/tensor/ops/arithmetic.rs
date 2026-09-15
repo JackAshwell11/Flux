@@ -1,3 +1,4 @@
+use crate::scalar::FluxNum;
 use crate::tensor::autograd::operations::{
     AddOperation, DivOperation, MulOperation, NegateOperation, SubOperation,
 };
@@ -13,7 +14,7 @@ fn compute_elementwise_tensor<T, F, O>(
     operation: O,
 ) -> Tensor<T>
 where
-    T: Copy + Default,
+    T: FluxNum,
     F: Fn(T, T) -> T,
     O: Operation<T> + 'static,
 {
@@ -47,7 +48,7 @@ where
 /// Compute the resultant elementwise operation with a tensor and a scalar.
 fn compute_scalar_tensor<T, F, O>(lhs: Tensor<T>, rhs: T, f: F, operation: O) -> Tensor<T>
 where
-    T: Copy + Default,
+    T: FluxNum,
     F: Fn(T, T) -> T,
     O: Operation<T> + 'static,
 {
@@ -77,7 +78,7 @@ where
 /// Compute the resultant elementwise operation with a single tensor.
 fn compute_unary_tensor<T, F, O>(tensor: Tensor<T>, f: F, operation: O) -> Tensor<T>
 where
-    T: Copy + Default,
+    T: FluxNum,
     F: Fn(T) -> T,
     O: Operation<T> + 'static,
 {
@@ -108,7 +109,7 @@ where
 /// left-hand side tensor.
 fn apply_elementwise_assign<T, F>(lhs: &Tensor<T>, rhs: &Tensor<T>, f: F)
 where
-    T: Copy,
+    T: FluxNum,
     F: Fn(T, T) -> T,
 {
     let rhs_data = broadcast_forward(rhs.data().as_ref(), lhs.data().len());
@@ -124,7 +125,7 @@ where
 /// side tensor.
 fn apply_scalar_assign<T, F>(lhs: &Tensor<T>, rhs: T, f: F)
 where
-    T: Copy,
+    T: FluxNum,
     F: Fn(T, T) -> T,
 {
     for x in lhs.data_mut().iter_mut() {
@@ -134,7 +135,7 @@ where
 
 impl<T> Add for Tensor<T>
 where
-    T: Copy + Add<Output = T> + Default + AddAssign,
+    T: FluxNum,
 {
     type Output = Self;
 
@@ -146,7 +147,7 @@ where
 
 impl<T> Add<T> for Tensor<T>
 where
-    T: Copy + Add<Output = T> + Default + AddAssign,
+    T: FluxNum,
 {
     type Output = Self;
 
@@ -158,7 +159,7 @@ where
 
 impl<T> AddAssign<Self> for Tensor<T>
 where
-    T: Copy + Add<Output = T>,
+    T: FluxNum,
 {
     /// Add a tensor to all tensor elements.
     fn add_assign(&mut self, rhs: Self) {
@@ -168,7 +169,7 @@ where
 
 impl<T> AddAssign<T> for Tensor<T>
 where
-    T: Copy + Add<Output = T>,
+    T: FluxNum,
 {
     /// Add a scalar to all tensor elements.
     fn add_assign(&mut self, rhs: T) {
@@ -178,7 +179,7 @@ where
 
 impl<T> Sub for Tensor<T>
 where
-    T: Copy + Sub<Output = T> + Default + AddAssign + Neg<Output = T>,
+    T: FluxNum,
 {
     type Output = Self;
 
@@ -190,7 +191,7 @@ where
 
 impl<T> Sub<T> for Tensor<T>
 where
-    T: Copy + Sub<Output = T> + Default + AddAssign + Neg<Output = T>,
+    T: FluxNum,
 {
     type Output = Self;
 
@@ -202,7 +203,7 @@ where
 
 impl<T> SubAssign<Self> for Tensor<T>
 where
-    T: Copy + Sub<Output = T>,
+    T: FluxNum,
 {
     /// Subtract a tensor from all tensor elements.
     fn sub_assign(&mut self, rhs: Self) {
@@ -212,7 +213,7 @@ where
 
 impl<T> SubAssign<T> for Tensor<T>
 where
-    T: Copy + Sub<Output = T>,
+    T: FluxNum,
 {
     /// Subtract a tensor from all tensor elements.
     fn sub_assign(&mut self, rhs: T) {
@@ -222,7 +223,7 @@ where
 
 impl<T> Mul for Tensor<T>
 where
-    T: Copy + Mul<Output = T> + Default + AddAssign,
+    T: FluxNum,
 {
     type Output = Self;
 
@@ -234,7 +235,7 @@ where
 
 impl<T> Mul<T> for Tensor<T>
 where
-    T: Copy + Mul<Output = T> + Default + AddAssign,
+    T: FluxNum,
 {
     type Output = Self;
 
@@ -246,7 +247,7 @@ where
 
 impl<T> MulAssign<Self> for Tensor<T>
 where
-    T: Copy + Mul<Output = T>,
+    T: FluxNum,
 {
     /// Multiply all tensor elements by a tensor.
     fn mul_assign(&mut self, rhs: Self) {
@@ -256,7 +257,7 @@ where
 
 impl<T> MulAssign<T> for Tensor<T>
 where
-    T: Copy + Mul<Output = T>,
+    T: FluxNum,
 {
     /// Multiply all tensor elements by a scalar.
     fn mul_assign(&mut self, rhs: T) {
@@ -266,7 +267,7 @@ where
 
 impl<T> Div for Tensor<T>
 where
-    T: Copy + Div<Output = T> + Default + AddAssign + Mul<Output = T> + Neg<Output = T>,
+    T: FluxNum,
 {
     type Output = Self;
 
@@ -278,7 +279,7 @@ where
 
 impl<T> Div<T> for Tensor<T>
 where
-    T: Copy + Div<Output = T> + Default + AddAssign + Mul<Output = T> + Neg<Output = T>,
+    T: FluxNum,
 {
     type Output = Self;
 
@@ -290,7 +291,7 @@ where
 
 impl<T> DivAssign<Self> for Tensor<T>
 where
-    T: Copy + Div<Output = T>,
+    T: FluxNum,
 {
     /// Divide all tensor elements by a tensor.
     fn div_assign(&mut self, rhs: Self) {
@@ -300,7 +301,7 @@ where
 
 impl<T> DivAssign<T> for Tensor<T>
 where
-    T: Copy + Div<Output = T>,
+    T: FluxNum,
 {
     /// Divide all tensor elements by a scalar.
     fn div_assign(&mut self, rhs: T) {
@@ -310,7 +311,7 @@ where
 
 impl<T> Neg for Tensor<T>
 where
-    T: Neg<Output = T> + Copy + Default + AddAssign,
+    T: FluxNum,
 {
     type Output = Self;
 

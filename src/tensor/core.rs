@@ -1,3 +1,4 @@
+use crate::scalar::FluxNum;
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
 use std::rc::Rc;
@@ -198,14 +199,14 @@ where
 
 impl<T> Tensor<T>
 where
-    T: From<f32> + Clone + Default,
+    T: FluxNum,
 {
     /// Create a tensor with a given shape and all ones.
     pub fn ones(shape: impl Into<Vec<usize>>, requires_grad: bool) -> Self {
         let shape = shape.into();
         let num_elements = shape.iter().product::<usize>();
         Self::from_parts(
-            vec![T::from(1.0); num_elements],
+            vec![T::one(); num_elements],
             shape,
             vec![T::default(); num_elements],
             requires_grad,

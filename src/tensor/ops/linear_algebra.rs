@@ -1,10 +1,10 @@
+use crate::scalar::FluxNum;
 use crate::tensor::autograd::operations::DotOperation;
 use crate::tensor::core::{OperationNode, Tensor};
-use std::ops::{Add, AddAssign, Mul};
 
 impl<T> Tensor<T>
 where
-    T: AddAssign,
+    T: FluxNum,
 {
     /// Perform a dot product on two tensors of the same shape.
     ///
@@ -12,10 +12,7 @@ where
     ///
     /// Panics if the shapes of `self` and `rhs` do not match.
     #[must_use]
-    pub fn dot(&self, rhs: &Self) -> Self
-    where
-        T: Copy + Mul<Output = T> + Add<Output = T> + Default,
-    {
+    pub fn dot(&self, rhs: &Self) -> Self {
         let dot = {
             assert_eq!(self.shape(), rhs.shape());
             self.data()

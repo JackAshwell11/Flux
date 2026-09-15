@@ -1,15 +1,12 @@
+use crate::scalar::{FluxFloat, FluxNum};
 use crate::tensor::autograd::operations::{
     AbsOperation, MaxOperation, MeanOperation, MinOperation, SumOperation,
 };
 use crate::tensor::core::{Operation, OperationNode, Tensor};
-use num_traits::{Float, One};
-use std::fmt::Debug;
-use std::iter::Sum;
-use std::ops::{AddAssign, MulAssign};
 
 impl<T> Tensor<T>
 where
-    T: Sum + Copy + Default + One,
+    T: FluxNum,
 {
     /// Sum the elements of a tensor.
     #[must_use]
@@ -33,14 +30,17 @@ where
 
 impl<T> Tensor<T>
 where
-    T: Float + Default + AddAssign,
+    T: FluxFloat,
 {
     /// Compute the absolute value of a tensor.
     #[must_use]
     pub fn abs(&self) -> Self {
         let (data, shape) = {
             (
-                self.data().iter().map(|x| x.abs()).collect::<Vec<_>>(),
+                self.data()
+                    .iter()
+                    .map(num_traits::Signed::abs)
+                    .collect::<Vec<_>>(),
                 self.shape(),
             )
         };
@@ -61,12 +61,7 @@ where
             },
         )
     }
-}
 
-impl<T> Tensor<T>
-where
-    T: Float + Sum + Default + AddAssign + Debug,
-{
     /// Compute the mean of a tensor.
     ///
     /// # Panics
@@ -100,7 +95,7 @@ where
 
 impl<T> Tensor<T>
 where
-    T: Copy + Debug + PartialOrd + Default + One + MulAssign + 'static,
+    T: FluxNum + 'static,
 {
     /// Compute the minimum or maximum value in the iterator and return it as a scalar tensor.
     fn compute_min_max<O>(

@@ -1,7 +1,6 @@
+use crate::scalar::FluxNum;
 use crate::tensor::core::{Operation, Tensor};
-use num_traits::{NumCast, One, Zero};
 use std::fmt::Debug;
-use std::ops::{AddAssign, Div, Mul, MulAssign, Neg};
 
 /// The add operation for the autograd engine.
 #[derive(Debug)]
@@ -58,7 +57,7 @@ pub(crate) struct MaxOperation<T> {
 
 impl<T> Operation<T> for AddOperation
 where
-    T: Copy + AddAssign + Default,
+    T: FluxNum,
 {
     /// Propagates the incoming gradient through the addition operation to both inputs.
     fn backward(&self, grad_output: &Tensor<T>, _parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
@@ -70,7 +69,7 @@ where
 
 impl<T> Operation<T> for SubOperation
 where
-    T: Copy + AddAssign + Neg<Output = T> + Default,
+    T: FluxNum,
 {
     /// Propagates the incoming gradient through the subtraction operation to both inputs.
     fn backward(&self, grad_output: &Tensor<T>, _parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
@@ -82,7 +81,7 @@ where
 
 impl<T> Operation<T> for MulOperation
 where
-    T: Copy + AddAssign + Default + Mul<Output = T>,
+    T: FluxNum,
 {
     /// Propagates the incoming gradient through the multiplication operation to both inputs.
     fn backward(&self, grad_output: &Tensor<T>, parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
@@ -99,7 +98,7 @@ where
 
 impl<T> Operation<T> for DivOperation
 where
-    T: Copy + AddAssign + Default + Mul<Output = T> + Div<Output = T> + Neg<Output = T>,
+    T: FluxNum,
 {
     /// Propagates the incoming gradient through the division operation to both inputs.
     fn backward(&self, grad_output: &Tensor<T>, parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
@@ -116,7 +115,7 @@ where
 
 impl<T> Operation<T> for MeanOperation
 where
-    T: Copy + AddAssign + Debug + Default + Mul<Output = T> + One + Div<Output = T> + NumCast,
+    T: FluxNum,
 {
     /// Propagates the incoming gradient through the mean operation to its input.
     fn backward(&self, grad_output: &Tensor<T>, _parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
@@ -128,7 +127,7 @@ where
 
 impl<T> Operation<T> for NegateOperation
 where
-    T: Copy + AddAssign + Default + Neg<Output = T>,
+    T: FluxNum,
 {
     /// Propagates the incoming gradient through the negation operation to its input.
     fn backward(&self, grad_output: &Tensor<T>, _parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
@@ -139,7 +138,7 @@ where
 
 impl<T> Operation<T> for DotOperation
 where
-    T: Copy + AddAssign + Default + Mul<Output = T>,
+    T: FluxNum,
 {
     /// Propagates the incoming gradient through the dot product operation to both inputs.
     fn backward(&self, grad_output: &Tensor<T>, parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
@@ -156,7 +155,7 @@ where
 
 impl<T> Operation<T> for SumOperation
 where
-    T: Copy + One + Mul<Output = T>,
+    T: FluxNum,
 {
     /// Propagates the incoming gradient through the summation operation to its input.
     fn backward(&self, grad_output: &Tensor<T>, _parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
@@ -167,7 +166,7 @@ where
 
 impl<T> Operation<T> for AbsOperation
 where
-    T: Copy + AddAssign + Default + PartialOrd + Zero + One + Neg<Output = T>,
+    T: FluxNum,
 {
     /// Propagates the incoming gradient through the absolute value operation to its input.
     fn backward(&self, grad_output: &Tensor<T>, parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
@@ -188,7 +187,7 @@ where
 /// Computes a new gradient tensor by multiplying the incoming gradient tensor with a mask.
 fn mask_gradient<T>(mask: &[T], grad_output: &Tensor<T>) -> Tensor<T>
 where
-    T: Copy + MulAssign,
+    T: FluxNum,
 {
     let grad = grad_output.clone();
     for (value, &mask) in grad.data_mut().iter_mut().zip(mask.iter()) {
@@ -199,7 +198,7 @@ where
 
 impl<T> Operation<T> for MinOperation<T>
 where
-    T: Copy + MulAssign + Debug,
+    T: FluxNum,
 {
     /// Propagates the incoming gradient through the minimum operation to its input.
     fn backward(&self, grad_output: &Tensor<T>, _parents: &[Tensor<T>]) -> Vec<Tensor<T>> {
@@ -210,7 +209,7 @@ where
 
 impl<T> Operation<T> for MaxOperation<T>
 where
-    T: Copy + MulAssign + Debug,
+    T: FluxNum,
 {
     /// Propagates the incoming gradient through the maximum operation to its input.
     fn backward(&self, grad_output: &Tensor<T>, _parents: &[Tensor<T>]) -> Vec<Tensor<T>> {

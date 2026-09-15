@@ -1,9 +1,9 @@
-use std::ops::AddAssign;
+use crate::scalar::FluxNum;
 
 /// Broadcast a tensor for a forward elementwise operation.
 pub fn broadcast_forward<T>(data: &[T], target_size: usize) -> Vec<T>
 where
-    T: Copy,
+    T: FluxNum,
 {
     if data.len() == target_size {
         // Tensor already has target size
@@ -24,7 +24,7 @@ where
 /// Reduce a broadcasted gradient back to the original tensor shape.
 pub fn broadcast_backward<T>(grad: &[T], parent_size: usize) -> Vec<T>
 where
-    T: Copy + Default + AddAssign,
+    T: FluxNum,
 {
     if grad.len() == parent_size {
         // Gradient matches the parent's shape
