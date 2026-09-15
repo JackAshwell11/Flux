@@ -1,26 +1,36 @@
 use crate::optim::core::Optimiser;
+use crate::scalar::FluxFloat;
 use crate::tensor::core::Tensor;
 
 /// Represents a Stochastic Gradient Descent optimiser.
-pub struct SGD {
+pub struct SGD<T>
+where
+    T: FluxFloat,
+{
     /// The parameters to optimise.
-    params: Vec<Tensor<f32>>,
+    params: Vec<Tensor<T>>,
 
     /// The learning rate.
-    lr: f32,
+    lr: T,
 }
 
-impl SGD {
+impl<T> SGD<T>
+where
+    T: FluxFloat,
+{
     /// Create an SGD optimiser.
     #[must_use]
-    pub const fn new(params: Vec<Tensor<f32>>, lr: f32) -> Self {
+    pub const fn new(params: Vec<Tensor<T>>, lr: T) -> Self {
         Self { params, lr }
     }
 }
 
-impl Optimiser for SGD {
+impl<T> Optimiser<T> for SGD<T>
+where
+    T: FluxFloat,
+{
     /// Returns a reference to the parameters of the optimiser.
-    fn params(&self) -> &[Tensor<f32>] {
+    fn params(&self) -> &[Tensor<T>] {
         &self.params
     }
 

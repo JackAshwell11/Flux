@@ -1,23 +1,7 @@
+use crate::scalar::FluxNum;
 use crate::tensor::autograd::graph::topological_sort;
 use crate::tensor::broadcast::broadcast_backward;
 use crate::tensor::core::Tensor;
-use num_traits::One;
-use std::fmt::Debug;
-use std::ops::AddAssign;
-
-impl<T> Tensor<T>
-where
-    T: Copy + AddAssign + Default,
-{
-    /// Accumulates incoming gradients into this tensor's gradient.
-    pub fn accumulate_grad(&self, incoming: &[T]) {
-        let mut grad = self.grad_mut();
-        let incoming = broadcast_backward(incoming, grad.len());
-        for (existing, incoming) in grad.iter_mut().zip(incoming.iter()) {
-            *existing += *incoming;
-        }
-    }
-}
 
 impl<T> Tensor<T>
 where
@@ -31,8 +15,17 @@ where
 
 impl<T> Tensor<T>
 where
-    T: Clone + One + Default + Debug + Copy + AddAssign,
+    T: FluxNum,
 {
+    /// Accumulates incoming gradients into this tensor's gradient.
+    pub fn accumulate_grad(&self, incoming: &[T]) {
+        let mut grad = self.grad_mut();
+        let incoming = broadcast_backward(incoming, grad.len());
+        for (existing, incoming) in grad.iter_mut().zip(incoming.iter()) {
+            *existing += *incoming;
+        }
+    }
+
     /// Performs reverse-mode automatic differentiation from this tensor.
     pub fn backward(&self) {
         // Skip if the tensor does not require gradients

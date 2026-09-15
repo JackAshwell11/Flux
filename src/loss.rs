@@ -1,14 +1,11 @@
+use crate::scalar::FluxFloat;
 use crate::tensor::core::Tensor;
-use num_traits::Float;
-use std::fmt::Debug;
-use std::iter::Sum;
-use std::ops::AddAssign;
 
 /// Compute the L1 loss between two tensors.
 #[must_use]
 pub fn l1_loss<T>(input: Tensor<T>, target: Tensor<T>) -> Tensor<T>
 where
-    T: Float + Sum + Default + AddAssign + Debug,
+    T: FluxFloat,
 {
     (input - target).abs().mean()
 }
@@ -17,7 +14,7 @@ where
 #[must_use]
 pub fn l2_loss<T>(input: Tensor<T>, target: Tensor<T>) -> Tensor<T>
 where
-    T: Float + Sum + Default + AddAssign + Debug,
+    T: FluxFloat,
 {
     let diff = input - target;
     let squared_diffs = diff.clone() * diff;

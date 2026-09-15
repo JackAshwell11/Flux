@@ -1,9 +1,9 @@
+use crate::scalar::FluxNum;
 use crate::tensor::core::Tensor;
-use std::ops::{Add, AddAssign, Mul};
 
 impl<T> Tensor<T>
 where
-    T: Default + Copy + Mul<Output = T> + Add<Output = T> + AddAssign,
+    T: FluxNum,
 {
     /// Perform a matrix multiplication on two tensors of the same shape.
     ///

@@ -8,3 +8,6 @@ pub mod tensor;
 
 /// Loss functions.
 pub mod loss;
+
+/// Shared numeric types.
+pub mod scalar;

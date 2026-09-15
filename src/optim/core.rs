@@ -1,9 +1,13 @@
+use crate::scalar::FluxFloat;
 use crate::tensor::core::Tensor;
 
 /// Represents an optimiser for a model.
-pub trait Optimiser {
+pub trait Optimiser<T>
+where
+    T: FluxFloat,
+{
     /// Returns a reference to the parameters of the model.
-    fn params(&self) -> &[Tensor<f32>];
+    fn params(&self) -> &[Tensor<T>];
 
     /// Performs a single step of the optimiser.
     fn step(&self);
@@ -11,7 +15,7 @@ pub trait Optimiser {
     /// Sets the gradients of all parameters to zero.
     fn zero_grad(&self) {
         for param in self.params() {
-            param.fill_grad(0.0);
+            param.fill_grad(T::zero());
         }
     }
 }
@@ -22,27 +26,36 @@ mod tests {
     use crate::tensor::core::Tensor;
 
     /// A mock optimiser for testing purposes.
-    struct DummyOptimiser {
-        params: Vec<Tensor<f32>>,
+    struct DummyOptimiser<T>
+    where
+        T: FluxFloat,
+    {
+        params: Vec<Tensor<T>>,
     }
 
-    impl DummyOptimiser {
+    impl<T> DummyOptimiser<T>
+    where
+        T: FluxFloat,
+    {
         /// Creates a new `DummyOptimiser` with the given parameters.
-        pub fn new(params: Vec<Tensor<f32>>) -> Self {
+        pub fn new(params: Vec<Tensor<T>>) -> Self {
             Self { params }
         }
     }
 
-    impl Optimiser for DummyOptimiser {
+    impl<T> Optimiser<T> for DummyOptimiser<T>
+    where
+        T: FluxFloat,
+    {
         /// Returns a reference to the parameters of the optimiser.
-        fn params(&self) -> &[Tensor<f32>] {
+        fn params(&self) -> &[Tensor<T>] {
             &self.params
         }
 
         /// Performs a single step of the optimiser.
         fn step(&self) {
             for param in &self.params {
-                param.fill_grad(1.0);
+                param.fill_grad(T::one());
             }
         }
     }
